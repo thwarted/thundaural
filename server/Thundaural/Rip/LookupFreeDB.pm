@@ -1,19 +1,18 @@
 #!/usr/bin/perl
 
-# $Header: /home/cvs/thundaural/server/TARipLookupFreeDB.pm,v 1.3 2004/03/27 08:58:47 jukebox Exp $
+# $Header: /home/cvs/thundaural/server/Thundaural/Rip/LookupFreeDB.pm,v 1.1 2004/05/22 06:40:00 jukebox Exp $
 
-package TARipLookupFreeDB;
-
-use Data::Dumper;
+package Thundaural::Rip::LookupFreeDB;
 
 use strict;
 use warnings;
 
-use TARipUtil;
+use Data::Dumper;
+use CDDB_get qw( get_cddb );
+
+use Thundaural::Util;
 
 my $tmpdir = "/var/tmp";
-
-use CDDB_get qw( get_cddb );
 
 sub new {
 	my $proto = shift;
@@ -58,24 +57,24 @@ sub lookup {
 	my $tracks = [];
 	foreach my $t (@{$cd->{track}}) {
 		my $ti = {};
-		$ti->{'trackname'} = TARipUtil::strcleanup($t);
-		$ti->{'performer'} = TARipUtil::strcleanup($cd->{artist});
-		$ti->{'performersort'} = TARipUtil::strcleanup($this->mksortname($cd->{artist}));
-		$ti->{'sectors'} = TARipUtil::strcleanup(shift @tlens);
+		$ti->{'trackname'} = Thundaural::Util::strcleanup($t);
+		$ti->{'performer'} = Thundaural::Util::strcleanup($cd->{artist});
+		$ti->{'performersort'} = Thundaural::Util::strcleanup($this->mksortname($cd->{artist}));
+		$ti->{'sectors'} = Thundaural::Util::strcleanup(shift @tlens);
 		$ti->{'length'} = int($ti->{'sectors'} / 75);
 		push(@$tracks, $ti);
 	}
 
 	return {tracks=>$tracks,
 		cdindexid=>$cdids->{cdindexid},
-		cddbid=>TARipUtil::strcleanup($cd{id}),
+		cddbid=>Thundaural::Util::strcleanup($cd{id}),
 		source=>'FreeDB',
 		numtracks=>(scalar @$tracks),
 		totaltime=>$cdids->{totaltime},
 		album=>{
-		   	performer=>TARipUtil::strcleanup($cd->{artist}),
-		   	performersort=>TARipUtil::strcleanup($this->mksortname($cd->{artist})),
-			albumname=>TARipUtil::strcleanup($cd->{title})
+		   	performer=>Thundaural::Util::strcleanup($cd->{artist}),
+		   	performersort=>Thundaural::Util::strcleanup($this->mksortname($cd->{artist})),
+			albumname=>Thundaural::Util::strcleanup($cd->{title})
 		   	}
 		};
 }
@@ -131,7 +130,7 @@ sub find_cdda2wav {
 sub get_cdids {
 	my $this = shift;
                                                                                                                                                                                  
-        my $tfile = TARipUtil::mymktempname($this->{storagedir}, $this->{cddevice}, 'discinfo.freedb');
+        my $tfile = Thundaural::Util::mymktempname($this->{storagedir}, $this->{cddevice}, 'discinfo.freedb');
 	my $cmd = sprintf('%s --device %s -N -J -v toc,sectors > %s 2>&1', $this->{bin_cdda2wav}, $this->{cddevice}, $tfile);
 	system($cmd);
 
@@ -169,3 +168,20 @@ sub get_cdids {
 }
 
 1;
+
+#    Thundaural Jukebox
+#    Copyright (C) 2003-2004  Andrew A. Bakun
+#
+#    This program is free software; you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation; either version 2 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program; if not, write to the Free Software
+#    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA

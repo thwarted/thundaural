@@ -1,8 +1,17 @@
 #!/usr/bin/perl
 
-package Player;
+# $Header: /home/cvs/thundaural/server/Thundaural/Server/PlayerOld.pm,v 1.1 2004/05/22 06:40:24 jukebox Exp $
 
-# $Header: /home/cvs/thundaural/server/Player.pm,v 1.3 2004/01/09 07:08:06 jukebox Exp $
+package Thundaural::Server::PlayerOld;
+
+# this implementation of the audio writer can be instanced multiple times, once
+# for each device you want to write to.  Different audio streams can be written
+# to each device -- it does not support writing one stream to multiple devices
+# because it uses external programs (the remote interface on mpg321 and 
+# ogg123 + a patch) to actually play the audio file.  Because of this, it suffers
+# from (fixable, but not worth fixing) unacceptable pauses between songs
+#
+# it is being included for future reference
 
 use strict;
 use warnings;
@@ -12,13 +21,11 @@ use threads::shared;
 use Thread::Queue;
 
 use File::Basename;
-
 use IPC::Open2;
-
 use DBI;
 
-use Settings;
-use Logger;
+use Thundaural::Server::Settings;
+use Thundaural::Logger;
 
 # music player
 #   - reads next song out of queue
@@ -293,6 +300,21 @@ sub usleep {
 	return 0;
 }
 
-
 1;
 
+#    Thundaural Jukebox
+#    Copyright (C) 2003-2004  Andrew A. Bakun
+#
+#    This program is free software; you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation; either version 2 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program; if not, write to the Free Software
+#    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA

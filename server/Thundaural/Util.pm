@@ -1,28 +1,43 @@
 #!/usr/bin/perl
 
-# $Header: /home/cvs/thundaural/server/shutdown-server.pl,v 1.3 2004/06/10 06:02:02 jukebox Exp $
+# $Header: /home/cvs/thundaural/server/Thundaural/Util.pm,v 1.1 2004/05/22 06:39:36 jukebox Exp $
+
+package Thundaural::Util;
+
+# just some common routines
 
 use strict;
 use warnings;
 
-use IO::Socket;
-use IO::Socket::INET;
+sub tmpnameprefix {
+	my $storagedir = shift;
+	my $device = shift;
 
-use Thundaural::Server::Settings;
-
-my $host = Thundaural::Server::Settings::listenhost();
-$host = "0.0.0.0" if (!$host); # doesn't work on all systems!
-my $port = Thundaural::Server::Settings::listenport();
-die("no port specified\n") if (!$port);
-
-# should have some kind of authentication here -- anyone could shutdown the server
-# even remotely
-my $conn = new IO::Socket::INET(PeerAddr=>$host, PeerPort=>$port, proto=>'tcp') or die("$!\n");
-if ($conn->connected()) {
-	print $conn "shut\n";
-	sleep 1;
+	my $cddx = $device;
+	$cddx =~ s/\W/_/g;
+	return sprintf('%s/newrip.device%s.', $storagedir, $cddx);
 }
-close($conn);
+
+sub mymktempname {
+	my $storagedir = shift;
+	my $device = shift;
+        my $purpose = shift;
+
+        $purpose = "rand".int(rand(99999)) unless $purpose;
+
+        return sprintf('%spid%d.%s', &tmpnameprefix($storagedir, $device), $$, $purpose);
+}
+
+sub strcleanup {
+	my $str = shift;
+
+	$str =~ s/^\s+//g;
+	$str =~ s/\s+$//g;
+	$str =~ s/\s+/ /g;
+	return $str;
+}
+
+1;
 
 #    Thundaural Jukebox
 #    Copyright (C) 2003-2004  Andrew A. Bakun
@@ -40,4 +55,3 @@ close($conn);
 #    You should have received a copy of the GNU General Public License
 #    along with this program; if not, write to the Free Software
 #    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-

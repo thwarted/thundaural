@@ -1,8 +1,8 @@
 #!/usr/bin/perl
 
-package Periodic;
+# $Header: /home/cvs/thundaural/server/Thundaural/Server/Periodic.pm,v 1.3 2004/05/31 08:23:10 jukebox Exp $
 
-# $Header: /home/cvs/thundaural/server/Periodic.pm,v 1.5 2004/03/16 08:28:47 jukebox Exp $
+package Thundaural::Server::Periodic;
 
 use strict;
 use warnings;
@@ -19,14 +19,10 @@ $Data::Dumper::Sortkeys = 1;
 
 use DBI;
 
-use Settings;
-use Logger;
+use Thundaural::Server::Settings;
+use Thundaural::Logger qw(logger);
 
-# music player
-#   - reads next song out of queue
-#   - plays song
-#       starts writer thread to send commands
-#       starts reader thread to read status
+# runs periodic tasks, like updating stats
 
 sub new {
 	my $class = shift;
@@ -35,7 +31,7 @@ sub new {
 	my $this = {};
 	bless $this, $class;
 
-	$this->dbfile($o{-dbfile});
+	$this->dbfile(Thundaural::Server::Settings::dbfile());
 
 	$this->{-cmdqueue} = new Thread::Queue;
 
@@ -67,7 +63,7 @@ sub _dbconnect {
 	my $dbfile = $this->{-dbfile};
 	if ($dbfile) {
 		$this->{-dbh} = DBI->connect("dbi:SQLite:dbname=$dbfile","","");
-		Logger::logger("dbh is ".$this->{-dbh});
+		logger("dbh is ".$this->{-dbh});
 	}
 }
 
@@ -92,7 +88,7 @@ sub run {
 	my $this = shift;
 
 	$this->_dbconnect();
-	my $storagedir = Settings::storagedir();
+	my $storagedir = Thundaural::Server::Settings::storagedir();
 
 	my $statsupdatefreq = 60 * 3;
 
@@ -117,9 +113,9 @@ sub run {
 				eval {
 					$this->_update_track_ranks();
 				};
-				Logger::logger($@) if ($@);
+				logger($@) if ($@);
 				my $end = time();
-				Logger::logger("calculated track rankings in ".($end-$start)." seconds");
+				logger("calculated track rankings in ".($end-$start)." seconds");
 				$laststatstime = time();
 				$laststatsphid = $thisphid;
 			}
@@ -127,18 +123,18 @@ sub run {
 
 		if ($this->{-cmdqueue}->pending()) {
 			my $cmd = $this->{-cmdqueue}->dequeue_nb();
-			Logger::logger("got cmd $cmd");
+			logger("got cmd $cmd");
 			if ($cmd && (my($seconds, $reqdev) = $cmd =~ m/^random (\d+) on (\w+)$/)) {
 				if ($this->{-trackstotal} > 20 && $this->{-tracksplayed} > 20) {
-					if (Settings::get($reqdev, 'play')) {
+					if (Thundaural::Server::Settings::get($reqdev, 'play')) {
 						if ($seconds) {
 							# put random songs in the queue for device $reqdev for $seconds
 							$randomplayend->{$reqdev} = time() + $seconds;
-							Logger::logger("starting random play on $reqdev -- will end in $seconds at "
+							logger("starting random play on $reqdev -- will end in $seconds at "
 									.localtime($randomplayend->{$reqdev}));
 						} else {
 							delete($randomplayend->{$reqdev});
-							Logger::logger("aborting random play on $reqdev");
+							logger("aborting random play on $reqdev");
 							
 						}
 						my $x = Dumper($randomplayend);
@@ -153,7 +149,7 @@ sub run {
 				eval {
 					$this->enqueue_random_song($d) if( ! $this->something_is_playing_on($d) );
 				};
-				Logger::logger($@) if ($@);
+				logger($@) if ($@);
 			} else {
 				delete($randomplayend->{$d});
 				my $x = Dumper($randomplayend);
@@ -164,7 +160,7 @@ sub run {
 		sleep 1;
 	}
 
-	Logger::logger("exiting statistics");
+	logger("periodic thread exiting");
 }
 
 sub enqueue_random_song {
@@ -181,7 +177,7 @@ sub enqueue_random_song {
 	$sth->execute($devicename);
 	my($trackid) = $sth->fetchrow_array();
 
-	Logger::logger("random play, enqeueing track $trackid");
+	logger("random play, enqueueing track $trackid");
 
 	$q = "insert into playhistory (playhistoryid, trackid, devicename, requestedat, source, action) values (NULL, ?, ?, ?, ?, ?)";
 	$sth = $this->{-dbh}->prepare($q);
@@ -259,3 +255,19 @@ sub _update_track_ranks {
 
 1;
 
+#    Thundaural Jukebox
+#    Copyright (C) 2003-2004  Andrew A. Bakun
+#
+#    This program is free software; you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation; either version 2 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program; if not, write to the Free Software
+#    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA

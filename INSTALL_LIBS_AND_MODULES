@@ -1,0 +1,85 @@
+$Header: /home/cvs/thundaural/INSTALL_LIBS_AND_MODULES,v 1.2 2004/06/10 06:00:15 jukebox Exp $
+
+Here's a quick list of of the libraries and perl modules needed by
+Thundaural Jukebox.  Many desktop/workstation installations may
+already have them.  Be sure to install any "development" packages
+so you can compile the perl modules that link with those libraries.
+I'm reasonablly sure this is an exhaustive list, but I might have
+missed something.
+
+Before you start installing things on this list, be sure to run the
+checkdeps script, which will tell you if you need to install something.
+
+Libraries
+ - for the client
+   libjpeg-6b
+   libjpeg-devel-6b
+   libpng-1.2.5
+   libpng-devel-1.2.5
+   SDL-1.2.7-1
+   SDL-devel-1.2.7-1
+   SDL_gfx-2.0.11-1
+   SDL_gfx-devel-2.0.11-1
+   SDL_image-1.2.3-1
+   SDL_image-devel-1.2.3-1
+   SDL_ttf-2.0.6-1
+   SDL_ttf-devel-2.0.6-1
+
+ - for the server
+   libvorbis-1.0.1-1
+   libvorbis-devel-1.0.1-1
+   vorbis-tools-1.0.1-1
+   libogg-1.1-1
+   libogg-devel-1.1-1
+   libao-0.8.4-1 (needed by vorbis-tools)
+   libao-devel-0.8.4-1
+   libmad-0.15.1b
+   libmad-devel-0.15.1b
+
+
+Perl Modules
+ - I think these are part of the perl standard distribution
+   File::Basename
+   Socket
+   IO::Socket
+   IO::Socket::INET
+   IO::Select
+   Data::Dumper
+   IO::File
+
+ - these are available on CPAN
+   DBI
+   DBD::SQLite
+   LWP
+   LWP::UserAgent
+   XML::Ximple
+   CDDB_get
+   Ogg::Vorbis::Decoder
+   Audio::Mad
+   MP3::Info
+   Audio::DSP
+   Audio::Wav
+
+ - these are all installed from perl-SDL. Download it from the
+   thundaural downloads page
+   SDL::Surface
+   SDL::Constants
+   SDL::App
+   SDL::Event
+   SDL::Color
+   SDL::Timer
+   SDL::Font
+   SDL::TTFont
+   SDL::Tool::Graphic
+   SDL::Cursor
+
+You'll also need a threaded perl (which you can verify with
+"perl -V | grep 'usethreads=define'"), which should come with 
+these modules:
+   threads
+   threads::shared
+   Thread::Queue
+
+You should install dagrab, which is a good, minimal, cdaudio
+extractor, from http://vertigo.fme.vutbr.cz/~stibor/dagrab.html
+

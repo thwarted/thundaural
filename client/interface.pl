@@ -1,11 +1,10 @@
 #!/usr/bin/perl
 
-# $Header: /home/cvs/thundaural/client/interface.pl,v 1.20 2004/03/27 08:34:35 jukebox Exp $
+# $Header: /home/cvs/thundaural/client/interface.pl,v 1.22 2004/03/29 08:59:56 jukebox Exp $
 
 use strict;
 use warnings;
 
-our ($dbh);
 our ($iCon);
 
 # set this to zero if you want the mouse pointer hidden, like
@@ -419,6 +418,19 @@ sub AUTOLOAD {
 	0;
 }
 
+sub error_msg_idle {
+	my $nowticks = SDL::App::ticks();
+	while(SDL::App::ticks() - $nowticks < 3000) {
+		my $event = new SDL::Event;
+		while ($event->poll()) {
+			my $type = $event->type();      # get event type
+			if ($type == SDL::SDL_QUIT) { Logger::logger("request quit"); exit; }
+			if ($type == SDL::SDL_KEYDOWN) { if ($event->key_name() eq 'q') { Logger::logger("exiting"); exit; } }
+		}
+		SDL::App::delay(0, 50);
+	}
+}
+
 sub setup_theme {
 	my($host, $port);
 	while (@_) {
@@ -436,7 +448,14 @@ sub setup_theme {
 	$instance_tmpdir = "/tmp/thundaural-client-cache-$$";
 	mkdir $instance_tmpdir, 0700;
 
-	$iCon = new ClientCommands(-errorfunc=>\&show_error_message, -recoveredfunc=>\&eatevents, -host=>$host, -port=>$port);
+	$iCon = new ClientCommands(
+			-clientlabel=>'TASDL',
+			-idlefunc=>\&error_msg_idle,
+			-errorfunc=>\&show_error_message, 
+			-recoveredfunc=>\&eatevents, 
+			-host=>$host, 
+			-port=>$port
+		);
 	$Albums = new Albums(-server=>$iCon, -tmpdir=>$instance_tmpdir);
 
 	my %args = (
@@ -502,19 +521,6 @@ __END__
 #		);
 #}
 #
-#sub dbconnect {
-#	my $db_database = 'jukebox';
-#	my $db_hostname = 'jukebox';
-#	my $db_port = 3306;
-#	my $db_user = 'jukebox';
-#	my $db_pass = 'jukebox';
-#	my $db_dsn = "DBI:mysql:database=$db_database;host=$db_hostname;port=$db_port";
-#
-#	my $dbh = DBI->connect($db_dsn, $db_user, $db_pass, {'RaiseError' => 1, 'PrintError'=>1});
-#	$dbh->trace(1);
-#	return $dbh;
-#}
-
 #our $E_SHOWALBUMS=SDL::SDLK_QUOTE;
 #our $E_SHOWTRACKS=SDL::SDLK_QUOTEDBL;
 #our $E_SHOWIDLE=SDL::SDLK_SEMICOLON;

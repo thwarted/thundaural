@@ -1,3 +1,67 @@
+changes from version 1.5.1 to version 1.6
+
+- added copyright notices to files, included GPL in the file COPYING
+
+- server code has been better organized into perl modules
+
+- the server now supports a 'flush <devicename>' command, to remove all queued
+  songs from that device
+ 
+- automaticly upgrade the database to version 5.  the only change to the
+  database is to expand the size of tracks.filename.  Then we search for file
+  names that were short and try to find matching entries on the filename and
+  update the database to be correct
+
+- added new option, --convert, which invokes code to perform optional or
+  risky updates manually.
+
+- bah, I stupidly wasn't storing the tracknumber in either the filenames
+  or the vorbis comments.  ripdisc.pl now does that, and a new optional
+  converter can be run (tracknumtags) to rename all the song files and
+  add the tracknumber tag to them.  See the --convert-help option to the
+  server.pl script for more info.  Additional tags are also added, like
+  RIPPER, CDINDEXID and CDDBID, for the sake of completeness.
+  Performing the tracknumtags conversion is entirely optional.
+
+- the format of the track filenames has changed to use double colons (::) to
+  divide the components, rather than using a dash.  double colon seems to have
+  fewer conflicts with actual track content.
+
+- created an abstracted audio file reader to unify the interfaces between
+  Audio::Mad and Ogg::Vorbis::Decoder.  New audio formats can be added in
+  the future using this interface.  The server will now play MP3s (although
+  this is currently of limited use because Thundaural does not support
+  MP3s in any other way -- you can put MP3s in the system by editing the
+  database manually).
+
+- now uses Audio::DSP to play audio data.  No longer requires the patched
+  ogg123 (using ogg123 was a nightmare)
+
+- because of the last two changes above, the server now has much greater
+  control of audio playback.  This allowed me to add a customized pause
+  between songs, which is four seconds by default.  If two songs are from 
+  sequential tracks on the same album, they will play with no pause between 
+  them.  This will allow seamless full-album playing.
+
+- changed to use Getopt::Long to parse server command line args
+
+- now all options can be specified in a configuration file rather
+  than perl code -- /etc/thundaural/server.conf replaces TAProgramLocations.pm
+  and Settings.pm.  Multiple configuration files can be used, and they
+  can be nested.
+
+- removed --syslog and --stderr options, replaced with --log, which can
+  take either 'syslog', 'stderr', or a filename to log to
+
+- added --dumpconf option, which displays the configuration to stdout and exits
+
+- fixed problem with LookupMusicBrainzRemote that was causing the performer
+  field for the entire album to be set to which ever artist was listed
+  last in the XML
+
+
+
+
 changes from version 1.5 to version 1.5.1
 
 - disabled the edit command, which has not been updated for the
@@ -251,4 +315,4 @@ changes from version 1.0 to version 1.1
   libs I'm using, or SDL::TTFont code such that memory gets leaked everytime 
   lots of text is drawn to a surface.
 
-$Header: /home/cvs/thundaural/CHANGELOG,v 1.13 2004/03/27 19:09:50 jukebox Exp $
+$Header: /home/cvs/thundaural/CHANGELOG,v 1.17 2004/06/06 01:18:57 jukebox Exp $

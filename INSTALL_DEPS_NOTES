@@ -1,0 +1,71 @@
+$Header: /home/cvs/thundaural/INSTALL_DEPS_NOTES,v 1.3 2004/06/06 01:21:08 jukebox Exp $
+
+This file describes various issues related to installation of
+dependancy libraries that I ran into.  Your milage may vary.
+
+
+SDL_gfx ---------------------------------------------------------------
+When compiling SDL_gfx, you may encounter an error from the assembler
+about redefined symbols.  Apparently, this is related to the use
+of -O3, which inlines functions.  If you are compiling from a SRC RPM,
+edit your RPM rc file (mine was /usr/lib/rpm/rpmrc) and change
+the necessary "-O3" to "-O2 -frename-registers" and that should fix it.
+Otherwise, set the CFLAGS env var on the command line before running
+configure.  I've most recently experienced this problem with gcc 3.3.3, 
+GNU assembler 2.14 20030612, and GNU ld version 2.14 20030612.
+This problem exists in at least SDL_gfx 2.0.10, I also experienced it
+in 2.0.11.   There is another problem with 2.0.11 when building the demos
+(it's looking for header files in a subdir named SDL but that doesn't
+exist.  Thundaural doesn't need the SDL_gfx demos, so you can just comment
+out the "%package demos", "%files demos" and the stuff that happens in the
+"Test" subdir during the %build.
+
+
+SDL_perl --------------------------------------------------------------
+The latest versions of SDL_perl use this new Build.PL build system, 
+rather than the older Makefile.PL method.  Unfortunately, there is 
+path detection problem that might crop up due to either lazily following
+the FSSTD or strictly following it (I'm not sure which).  The fix is
+to edit _build/notes and in the extra_compiler_flags array of the
+OpenGL.xs section, add
+	'-I/usr/X11R6/include'
+right after
+	'-I/usr/X11R6/include/GL'
+Don't forget to install SDL_perl after installing all the other SDL 
+sub-libraries.
+
+
+libao -----------------------------------------------------------------
+The libao SRC RPM from xiph.org (at least for version 0.8.4) requires
+libarts and esound.  You can just comment out those requires lines.
+The configure step detects that those libraries are missing and will
+exclude support.  Thundaural only needs oggenc from vorbis-tools,
+so the exact output audio methods doesn't really matter.
+
+
+vorbis-tools ----------------------------------------------------------
+The vorbis-tools SRC RPM from xiph.org requires FLAC and SPEEX, but 
+thundaural jukebox doesn't need to decode those formats.  To disable
+them, just comment them out of the .spec file.  The configure step
+will automaticly pick-up that the libs are missing and not include 
+support for them.
+
+
+Audio::DSP ------------------------------------------------------------
+Make sure your OSS-compatible audio drivers are loaded (or will be auto
+loaded) before attempting to run the tests for Audio::DSP.  There also
+seems to be a bug with the tests that keeps it from setting the audio
+device properties during testing, but the module works fine anyway.
+If you're using CPAN to install Audio::DSP, you might need to do
+   force install Audio::DSP
+if it fails the first time.
+
+
+Audio::Wav ------------------------------------------------------------
+For some reason, the tests fail to write the same audio file it reads.
+This is unimportant for Thundaural, since we are only using Audio::Wav
+to read files (and temporarily at that, until the server has a chance
+to vorbis encode them).  If you're using CPAN, install with:
+   force install Audio::Wav
+if it fails the first time.
+

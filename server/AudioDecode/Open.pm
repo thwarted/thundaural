@@ -1,28 +1,48 @@
 #!/usr/bin/perl
 
-# $Header: /home/cvs/thundaural/server/shutdown-server.pl,v 1.3 2004/06/10 06:02:02 jukebox Exp $
+# $Header: /home/cvs/thundaural/server/AudioDecode/Open.pm,v 1.3 2004/06/10 06:01:40 jukebox Exp $
+
+package AudioDecode::Open;
+
+# this is a wrapper package that will create a decoder that will
+# decode the passed file based on its filename extension
 
 use strict;
 use warnings;
 
-use IO::Socket;
-use IO::Socket::INET;
+my @modules = qw( AudioDecode::OggVorbis AudioDecode::MP3 AudioDecode::Wav );
 
-use Thundaural::Server::Settings;
+my %exts = ();
+my @foundmods = ();
 
-my $host = Thundaural::Server::Settings::listenhost();
-$host = "0.0.0.0" if (!$host); # doesn't work on all systems!
-my $port = Thundaural::Server::Settings::listenport();
-die("no port specified\n") if (!$port);
-
-# should have some kind of authentication here -- anyone could shutdown the server
-# even remotely
-my $conn = new IO::Socket::INET(PeerAddr=>$host, PeerPort=>$port, proto=>'tcp') or die("$!\n");
-if ($conn->connected()) {
-	print $conn "shut\n";
-	sleep 1;
+foreach my $mod (@modules) {
+	eval "use $mod;";
+	if (!$@) {
+		my $code = 'return '.$mod.'::match_ext();';
+		my $re = eval($code);
+		if (!$@ && $re) {
+			push(@foundmods, $mod);
+			$exts{$mod} = $re;
+			next;
+		}
+	}
+	warn("unable to setup $mod\n$@");
 }
-close($conn);
+
+sub open {
+	my %o = @_;
+	my $file = $o{file};
+
+	foreach my $mod (@foundmods) {
+		my $re = $exts{$mod};
+		if ($file =~ m/$re/) {
+			return new $mod(%o);
+		}
+	}
+	return undef;
+}
+
+1;
 
 #    Thundaural Jukebox
 #    Copyright (C) 2003-2004  Andrew A. Bakun
@@ -40,4 +60,3 @@ close($conn);
 #    You should have received a copy of the GNU General Public License
 #    along with this program; if not, write to the Free Software
 #    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-

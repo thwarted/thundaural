@@ -1,8 +1,12 @@
 #!/usr/bin/perl
 
-package Reader;
+# $Header: /home/cvs/thundaural/server/Thundaural/Server/Reader.pm,v 1.2 2004/05/30 09:17:09 jukebox Exp $
 
-# $Header: /home/cvs/thundaural/server/Reader.pm,v 1.4 2004/03/16 08:25:14 jukebox Exp $
+package Thundaural::Server::Reader;
+
+# this is the interface to the audio reader script (ripcdrom.pl)
+# it mainly just translates the output from the script to
+# the internal format the server uses
 
 use strict;
 use warnings;
@@ -15,8 +19,8 @@ use File::Basename;
 
 use DBI;
 
-use Settings;
-use Logger;
+use Thundaural::Server::Settings;
+use Thundaural::Logger qw(logger);
 
 
 sub new {
@@ -28,7 +32,7 @@ sub new {
 
 	$this->{-device} = $o{-device};
 	die("unknown device passed") if (!$this->{-device});
-	$this->{-devicefile} = Settings::get($this->{-device}, 'read');
+	$this->{-devicefile} = Thundaural::Server::Settings::get($this->{-device}, 'read');
 	die("not a readable device") if (!$this->{-devicefile});
 
 	$this->{-cmdqueue} = new Thread::Queue;
@@ -60,7 +64,7 @@ sub _dbconnect {
 	my $dbfile = $this->{-dbfile};
 	if ($dbfile) {
 		$this->{-dbh} = DBI->connect("dbi:SQLite:dbname=$dbfile","","");
-		Logger::logger("dbh is ".$this->{-dbh});
+		logger("dbh is ".$this->{-dbh});
 	}
 }
 
@@ -93,7 +97,7 @@ sub run {
 	my $this = shift;
 
 	$this->_dbconnect();
-	my $storagedir = Settings::storagedir();
+	my $storagedir = Thundaural::Server::Settings::storagedir();
 
 	RUN:
 	while ($main::run) {
@@ -113,11 +117,11 @@ sub run {
 			if ($cmd =~ m/^abort$/) {
 				last RUN;
 			}
-			Logger::logger("reader got \"$cmd\", ignoring");
+			logger("reader got \"$cmd\", ignoring");
 		}
 		last RUN if (!$main::run);
 
-		my $ripcmd = Settings::get('ripcdrom', 'command');
+		my $ripcmd = Thundaural::Server::Settings::command('ripcdrom');
 		my @ppargs = split(/\s+/, $ripcmd);
 		{
 			my @x = ();
@@ -131,23 +135,23 @@ sub run {
 			}
 			@ppargs = @x;
 		}
-		push(@ppargs, '|');
+		@ppargs = (@ppargs, '|');
 
 		my $plread;
 		my $rpid = open($plread, join(' ', @ppargs));
-		Logger::logger("rpid = $rpid");
+		logger("rpid = $rpid");
 		if (!$rpid) {
 			${$this->{-track}} = "error starting ripper: $@";
 			${$this->{-state}} = "idle";
 			next RUN;
 		}
-		Logger::logger("started \"".join(' ', @ppargs)."\"");
+		logger("started \"".join(' ', @ppargs)."\"");
 		my $readthr = threads->new(sub { $this->_read_status($plread, $rpid); } );
 
 		TILLFINISHED:
 		while(my $cmd = $this->{-cmdqueue}->dequeue()) {
-			if ($cmd =~ m/^abort/) {
-				Logger::logger("got abort, killing $rpid");
+			if ($cmd =~ m/^abortrip/) {
+				logger("got abort, killing $rpid");
 				kill 15, $rpid;
 				${$this->{-track}} = "user aborted $rpid";
 				${$this->{-state}} = 'idle';
@@ -157,12 +161,12 @@ sub run {
 		}
 		waitpid $rpid, 0;
 		my $success = $readthr->join;
-		Logger::logger("reader thread returned $success");
+		logger("reader thread returned $success");
 
 		# devicename state volume trackref performer name genre length trackid started current percentage
 	}
 
-	Logger::logger($this->{-device}." exiting");
+	logger($this->{-device}." reader thread exiting");
 }
 
 sub _read_status {
@@ -187,7 +191,7 @@ sub _read_status {
 				my $vol = (shift @x) || '-';
 				my $trkrf = (shift @x) || '-';
 				if ((int($pct) % 10) == 0 || $corrections != 0) {
-					Logger::logger("track $trkrf, $vol, $pct%, $corrections corrections");
+					logger("track $trkrf, $vol, $pct%, $corrections corrections");
 				}
 			}
 		}
@@ -202,3 +206,19 @@ sub _read_status {
 
 1;
 
+#    Thundaural Jukebox
+#    Copyright (C) 2003-2004  Andrew A. Bakun
+#
+#    This program is free software; you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation; either version 2 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program; if not, write to the Free Software
+#    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA

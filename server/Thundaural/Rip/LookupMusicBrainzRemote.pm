@@ -1,8 +1,8 @@
 #!/usr/bin/perl
 
-# $Header: /home/cvs/thundaural/server/TARipLookupMusicBrainzRemote.pm,v 1.2 2004/03/21 06:01:01 jukebox Exp $
+# $Header: /home/cvs/thundaural/server/Thundaural/Rip/LookupMusicBrainzRemote.pm,v 1.5 2004/06/09 06:38:41 jukebox Exp $
 
-package TARipLookupMusicBrainzRemote;
+package Thundaural::Rip::LookupMusicBrainzRemote;
 
 use strict;
 use warnings;
@@ -11,7 +11,7 @@ use Data::Dumper;
 use XML::Ximple;
 use LWP::UserAgent;
 
-use TARipUtil;
+use Thundaural::Util;
 
 sub new {
 	my $proto = shift;
@@ -43,8 +43,6 @@ sub find_cdda2wav {
 sub lookup {
 	my $this = shift;
 
-	#return undef;
-
 	my $cdinfo = $this->get_cd_info();
 	my $cdindexid = $cdinfo->{cdindexid};
 	my @tlens = @{$cdinfo->{tracklens}};
@@ -53,6 +51,7 @@ sub lookup {
 	my $tree = XML::Ximple::parse_xml($xml);
 
 	$this->{albuminfo} = {
+                'creator'=>undef,
 		'artist'=>undef,
 		'gid'=>undef,
 		'tracks'=>[],
@@ -98,14 +97,14 @@ sub get_cd_info {
 	#Table of Contents: total tracks:11, (total time 50:14.72)
 	# CDINDEX discid: zP9XT1MCijZ7lWP.SyRQjva14Zc-
                                                                                                                                                                                  
-        my $tfile = TARipUtil::mymktempname($this->{storagedir}, $this->{cddevice}, 'discinfo');
+        my $tfile = Thundaural::Util::mymktempname($this->{storagedir}, $this->{cddevice}, 'discinfo');
 	my $cmd = sprintf('%s --device %s -N -J -v toc,sectors > %s 2>&1', $this->{bin_cdda2wav}, $this->{cddevice}, $tfile);
 	system($cmd);
 
         open(C2W, "<$tfile");
 	my @output = <C2W>;
 	close(C2W);
-        unlink($tfile);
+        #unlink($tfile);
 
 	my(@x, $discidline, $x);
         my $tlens = [];
@@ -181,8 +180,8 @@ sub get_xml {
 				'xmlns:mq'=>'http://musicbrainz.org/mm/mq-1.1#',
 				'xmlns:mm'=>'http://musicbrainz.org/mm/mm-2.1#'
 			},
-		tag_name=>'rdf:RDF',
-		content=>[$query]
+			tag_name=>'rdf:RDF',
+			content=>[$query]
 		}];
 
 		my $c1 = XML::Ximple::ximple_to_string($wrapper);
@@ -231,7 +230,10 @@ sub process_tree {
 		my $vs = $var ? ', \'var\'=>$var' : '';
 		my $c = sprintf('$this->handle_%s%s(\'attrib\'=>$node->{attrib}, \'tree\'=>$node->{content}%s);', $parent, $nodename, $vs);
 		eval $c;
-		warn $@ if ($@);
+		if ($@) {
+			my $re = sprintf("Can't locate object method \"handle_%s%s\" via package \"%s\"", $parent, $nodename, __PACKAGE__);
+			warn $@ if ($@ !~ m/$re/);
+		}
 	}
 }
 
@@ -285,6 +287,9 @@ sub handle_album_creator {
 	my $this = shift;
 	my %o = @_;
 	my $tree = $o{'tree'};
+        my $y = $this->extract_mb_gid($o{'attrib'}->{'resource'});
+        die("album resource attribute isn't artist") unless ($y->{type} eq 'artist');
+        $this->{albuminfo}->{creator} = $y->{gid};
 	$this->process_tree('tree'=>$tree);
 }
 
@@ -298,7 +303,13 @@ sub handle_artist {
 	my $tinfo = {'gid'=>$y->{gid}, name=>undef};
 	$this->process_tree('tree'=>$tree, 'parent'=>'artist', 'var'=>$tinfo);
 	$this->{artists}->{$tinfo->{gid}} = $tinfo;
-	$this->{albuminfo}->{artist} = $tinfo;
+        if ( defined($this->{albuminfo}->{creator}) &&
+             $this->{albuminfo}->{creator} eq $tinfo->{gid}) {
+                # gotta watch it here -- MusicBrainz should have artist resources later 
+                # in the XML than the entities that reference those resources
+                # I don't know if that is guaranteed
+                $this->{albuminfo}->{artist} = $tinfo;
+        }
 }
 
 sub handle_artist_title {
@@ -363,3 +374,19 @@ sub handle_album_coverart { return; }
 
 1;
 
+#    Thundaural Jukebox
+#    Copyright (C) 2003-2004  Andrew A. Bakun
+#
+#    This program is free software; you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation; either version 2 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program; if not, write to the Free Software
+#    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA

@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-# $Header: /home/cvs/thundaural/server/server.pl,v 1.17 2004/03/21 05:59:23 jukebox Exp $
+# $Header: /home/cvs/thundaural/server/server.pl,v 1.27 2004/06/10 05:56:44 jukebox Exp $
 
 use strict;
 use warnings;
@@ -10,145 +10,75 @@ use threads::shared;
 use Thread::Queue;
 
 use File::Basename;
-
-my $home = File::Basename::dirname($0);
-$ENV{HOME} = $home;
-chdir $home;
-
-use IPC::Open2;
 use Socket;
 use IO::Socket;
 use IO::Socket::INET;
 use IO::Select;
 
-use Settings;
-use ServerCommands;
-use Logger;
-use Player;
-use Reader;
-use Periodic;
+use Thundaural::Server::Settings;
+use Thundaural::Logger qw(logger);
+use Thundaural::Server::ServerCommands;
+use Thundaural::Server::Player;
+use Thundaural::Server::Reader;
+use Thundaural::Server::Periodic;
+use Thundaural::Server::Threads;
 
-use DatabaseSetup;
+use Thundaural::Server::DatabaseSetup;
 
 use POSIX qw/setsid/;
 
 use DBI;
 
-my $daemonize = 1;
-my $port = Settings::listenport();
-my $dbfile = Settings::dbfile();
-while (@ARGV) {
-	my $a = shift @ARGV;
-	if ($a =~ m/^--?p(ort)?/) {
-		$port = shift @ARGV;
-		next;
-	}
-	if ($a =~ m/^--?db(file)?/) {
-		$dbfile = shift @ARGV;
-		next;
-	}
-	if ($a =~ m/^--?dontfork/) {
-		$daemonize = 0;
-		next;
-	}
+my $storagedir = Thundaural::Server::Settings::storagedir();
+{
+        my $c = Thundaural::Server::Settings::convert();
+        Thundaural::Logger::init($c ? 'stderr' : Thundaural::Server::Settings::logto());
+        Thundaural::Server::DatabaseSetup::init(
+        	dbfile=>Thundaural::Server::Settings::dbfile(),
+        	storagedir=>$storagedir
+        );
+        &do_conversions() if ($c);
 }
 
-if ($daemonize) {
+if (!Thundaural::Server::Settings::foreground()) {
 	open STDIN, '</dev/null' or die("can't read /dev/null: $!\n");
 	open STDOUT, '>>/dev/null' or die("can't write to /dev/null: $!\n");
 	open STDERR, '>>/dev/null' or die("can't write to /dev/null: $!\n");
 	defined(my $pid = fork) or die("can't fork: $!\n");
 	exit if ($pid);
 	setsid or die("can't set new session: $!\n");
-	umask 0;
+	umask 0022;
 }
-
-DatabaseSetup::init($dbfile);
-
-my $listener = new IO::Socket::INET(Listen => 5, LocalPort => $port, Proto => 'tcp', ReuseAddr => 1);
-die if ($@);
 
 our $run : shared = 1;
 
-my $storagedir = Settings::storagedir();
 my $dblock : shared = 0xfef1f0fa;
 
-my $periodic;
-my $periodicthr;
-{
-	my $pstate : shared = '';
-	$periodic = new Periodic(-dbfile=>$dbfile, 
-				-ref_dblock=>\$dblock,
-				-ref_state=>\$pstate,
-			);
-	$periodicthr = threads->new(sub { eval { $periodic->run(); }; Logger::logger("periodic tasks thread no longer running $@"); } );
-}
+my($periodic, $periodicthr) = Thundaural::Server::Threads::start_periodic(\$dblock);;
+my $playerthrs = Thundaural::Server::Threads::start_players(\$dblock);
+my $readerthrs = Thundaural::Server::Threads::start_readers(\$dblock);
 
-my $playerthrs = {};
-{
-	my $playdevs = Settings::get_of_type('play');
-	foreach my $po (@$playdevs) {
-		my $device = $po->{devicename};
-		$playerthrs->{$device} = &spawn_player_thread($device);
-	}
-}
-my $readerthrs = {};
-{
-	my $readdevs = Settings::get_of_type('read');
-	foreach my $ro (@$readdevs) {
-		my $device = $ro->{devicename};
-		$readerthrs->{$device} = &spawn_reader_thread($device);
-	}
-}
-sleep 3; # give everything a chance to initialize
-#$0 = "thundaural-jukebox-server";
+sleep 1; # give everything a chance to initialize
+
+my $listener = new IO::Socket::INET(Listen => 5, 
+				LocalAddr=>Thundaural::Server::Settings::listenhost(), 
+				LocalPort=>Thundaural::Server::Settings::listenport(), 
+				Proto=>'tcp',
+				ReuseAddr => 1)
+	or die("$0: can't bind: $@\n");
+logger('now listening on %s:%s', $listener->sockhost(), $listener->sockport());
+
+$0 = "thundaural-server(thread)";
 my $serverthr = threads->new(\&server);
 $serverthr->join;
 undef $serverthr;
 
 exit;
 
-sub spawn_player_thread {
-	my $device = shift;
-	my $stat_state : shared = 'idle';
-	my $stat_position : shared = '';
-	my $stat_track : shared = '';
-	my $player = new Player(-dbfile=>$dbfile,
-				-device=>$device,
-				-ref_state=>\$stat_state,
-				-ref_position=>\$stat_position,
-				-ref_track=>\$stat_track,
-				-ref_dblock=>\$dblock,
-			);
-	# we set this to one here to avoid a race condition, whereby the thread hasn't started yet, and we still read -running as 0
-	my $running : shared = 1;
-	my $playerthr = threads->new(sub { $running = 1; eval { $player->run(); }; Logger::logger("player thread for $device no longer running $@"); $running = 0; });
-	my $ret = {-thread=>$playerthr, -object=>$player, -running=>\$running};
-	return $ret;
-}
-
-sub spawn_reader_thread {
-	my $device = shift;
-	my $stat_state : shared = 'idle';
-	my $stat_track : shared = '';
-	my $reader = new Reader(-dbfile=>$dbfile,
-				-device=>$device,
-				-ref_state=>\$stat_state,
-				-ref_track=>\$stat_track,
-				-ref_dblock=>\$dblock
-			);
-	# we set this to one here to avoid a race condition, whereby the thread hasn't started yet, and we still read -running as 0
-	my $running : shared = 1; 
-	my $readerthr = threads->new(sub { $running = 1; eval { $reader->run(); }; Logger::logger("reader thread for $device no longer running $@"); $running = 0; });
-	my $ret = {-thread=>$readerthr, -object=>$reader, -running=>\$running};
-	return $ret;
-}
-
 sub server {
-	my $cmdhandler = new ServerCommands(
-				-dbfile=>$dbfile, 
-				-playerthrs=>$playerthrs,
+	my $cmdhandler = new Thundaural::Server::ServerCommands(
 				-readerthrs=>$readerthrs,
+				-playerthrs=>$playerthrs,
 				-periodic=>$periodic,
 				-ref_dblock=>\$dblock, 
 			);
@@ -177,7 +107,7 @@ sub server {
 			if ($fh == $listener) {
 				my $newsock = $listener->accept();
 				my $peer = $newsock->peerhost().":".$newsock->peerport();
-				Logger::logger("connection from $peer");
+				logger("connection from $peer");
 				$selreaders->add($newsock);
 				$connections->{$newsock} = {peername=>$peer, name=>$peer, connectedat=>time()};
 			} else {
@@ -189,7 +119,7 @@ sub server {
 
 					# unfortuantely, some commands can't be implemented in ServerCommands.pm
 					if ($input =~ m/^shut/) {
-						Logger::logger('shutdown requested by %s (%s)', 
+						logger('shutdown requested by %s (%s)', 
 							$connections->{$fh}->{name},
 							$connections->{$fh}->{peername});
 						last READLOOP;
@@ -197,21 +127,21 @@ sub server {
 
 					# the following if was added to test player/reader thread restarting upon death
 					# it will eventually be removed
-					if ($input =~ m/^exit (\w+)$/) {
-						my $dv = $1;
-						if (exists($playerthrs->{$dv})) {
-							$playerthrs->{$dv}->{-object}->cmdqueue()->enqueue('abort');
-							# get the player thread to exit
-							$playerthrs->{$dv}->{-object}->cmdqueue()->enqueue(undef); 
-							print $fh "200 told $dv to abort\n";
-						} else {
-							print $fh "300 unknown play device $dv\n";
-						}
-						next;
-					}
+#					if ($input =~ m/^exit (\w+)$/) {
+#						my $dv = $1;
+#						if (exists($playerthrs->{$dv})) {
+#							$playerthrs->{$dv}->{-object}->cmdqueue()->enqueue('abort');
+#							# get the player thread to exit
+#							$playerthrs->{$dv}->{-object}->cmdqueue()->enqueue(undef); 
+#							print $fh "200 told $dv to abort\n";
+#						} else {
+#							print $fh "300 unknown play device $dv\n";
+#						}
+#						next;
+#					}
 
 					my ($result, $output) = eval { $cmdhandler->process($input, $fh, $connections); };
-					Logger::logger($@, 'server') if ($@);
+					logger($@, 'server') if ($@);
 					if (ref($output) ne 'ARRAY') {
 						$output = [$output];
 					}
@@ -224,9 +154,9 @@ sub server {
 						$lastcount++;
 					} else {
 						if ($lastcount) {
-							Logger::logger("last message repeated $lastcount times", $lastname);
+							logger("last message repeated $lastcount times", $lastname);
 						}
-						Logger::logger($msg, $connections->{$fh}->{name});
+						logger($msg, $connections->{$fh}->{name});
 						$lastmsg = $msg;
 						$lastname = $connections->{$fh}->{name};
 						$lastcount = 0;
@@ -238,12 +168,12 @@ sub server {
 				}
 				if (!defined($input) || $discon) {
 					if ($lastcount) {
-						Logger::logger("last message repeated $lastcount times", $lastname);
+						logger("last message repeated $lastcount times", $lastname);
 						$lastmsg = '';
 						$lastname = '';
 						$lastcount = 0;
 					}
-					Logger::logger("disconnecting from ".$connections->{$fh}->{name});
+					logger("disconnecting from ".$connections->{$fh}->{name});
 					delete($connections->{$fh});
 					delete $pendingwrites->{$fh};
 					$selreaders->remove($fh);
@@ -252,53 +182,61 @@ sub server {
 				}
 			}
 		}
+
+		# remove from the select call any writers that no longer have pending output
 		foreach my $p (keys %$pendingwrites) {
 			my $amt = scalar @{$pendingwrites->{$p}};
 			if (!$amt) { $selwriters->remove($p); }
 		}
-		foreach my $dv (keys %$playerthrs) {
-			if (! ${$playerthrs->{$dv}->{-running}}) {
-				Logger::logger("player thread for $dv seems to have died, creating new");
-				$playerthrs->{$dv}->{-thread}->join();
-				$playerthrs->{$dv} = &spawn_player_thread($dv);
-			}
-		}
+
+		# respawn dead player threads
+#		foreach my $dv (keys %$playerthrs) {
+#			if (! ${$playerthrs->{$dv}->{-running}}) {
+#				logger("player thread for $dv seems to have died, creating new");
+#				$playerthrs->{$dv}->{-thread}->join();
+#				$playerthrs->{$dv} = &spawn_player_thread($dv);
+#			}
+#		}
+
+		# respawn dead reader threads
 		foreach my $dv (keys %$readerthrs) {
 			if (! ${$readerthrs->{$dv}->{-running}}) {
-				Logger::logger("reader thread for $dv seems to have died, creating new");
+				logger("reader thread for $dv seems to have died, creating new");
 				$readerthrs->{$dv}->{-thread}->join();
-				$readerthrs->{$dv} = &spawn_reader_thread($dv);
+				$readerthrs->{$dv} = Thundaural::Server::Threads::spawn_reader($dv, \$dblock);
 			}
 		}
 
 		# commands have been pushed in to the queue that won't be used
 		# avoid filling up memory with these commands
-#		foreach my $dv (keys %$playerthrs) {
-#			my $c = 0;
-#			my $pvo = $playerthrs->{$dv}->{-object};
-#			while(${$pvo->state()} eq 'idle' && $pvo->cmdqueue()->pending()) { 
-#				my $x = $pvo->cmdqueue()->dequeue(); 
-#				Logger::logger("   $dv: removed \"$x\"", 'mainloop');
-#				$c++;
-#			} 
-#			Logger::logger("cleared $dv player command queue of $c entries", 'mainloop') if ($c);
-#		}
+	#	foreach my $dv (keys %$playerthrs) {
+	#		my $c = 0;
+	#		my $pvo = $playerthrs->{$dv}->{-object};
+	#		while(${$pvo->state()} eq 'idle' && $pvo->cmdqueue()->pending()) { 
+	#			my $x = $pvo->cmdqueue()->dequeue(); 
+	#			logger("   $dv: removed \"$x\"", 'mainloop');
+	#			$c++;
+	#		} 
+	#		logger("cleared $dv player command queue of $c entries", 'mainloop') if ($c);
+	#	}
 	}
 	$run = 0;
 
 	foreach my $dv (keys %$playerthrs) {
 		$playerthrs->{$dv}->{-object}->cmdqueue()->enqueue('abort');
 		$playerthrs->{$dv}->{-object}->cmdqueue()->enqueue(undef); # get the player thread to exit
-		threads->yield();
+		$playerthrs->{$dv}->{-thread}->join();
+		#threads->yield();
 	}
 	foreach my $dv (keys %$readerthrs) {
 		$readerthrs->{$dv}->{-object}->cmdqueue()->enqueue('abort');
 		$readerthrs->{$dv}->{-object}->cmdqueue()->enqueue(undef); # get the reader thread to exit
-		threads->yield();
+		$readerthrs->{$dv}->{-thread}->join();
+		#threads->yield();
 	}
 	foreach my $fh (keys %$connections) {
 		next if ($fh eq 'server');
-		Logger::logger("shutdown, closing ".$connections->{$fh}->{name});
+		logger("shutdown, closing ".$connections->{$fh}->{name});
 		close($fh);
 	}
 	close($listener);
@@ -307,3 +245,37 @@ sub server {
 	threads->yield();
 }
 
+sub do_conversions {
+	my $c = Thundaural::Server::Settings::convert();
+	return if (!$c);
+
+	my($what, $opts) = split(/:/, $c);
+	my @opts = split(/;/, $opts || '');
+	my %o = ();
+	foreach my $x (@opts) {
+		my($k, $v) = split(/=/, $x);
+		$o{$k} = $v;
+	}
+	if ($what eq 'tracknumtags') {
+		Thundaural::Server::DatabaseSetup::tag_files_with_tracknum(%o);
+		exit;
+        }
+	die("$0: unknown conversion \"$what\"\n");
+}
+
+#    Thundaural Jukebox
+#    Copyright (C) 2003-2004  Andrew A. Bakun
+#
+#    This program is free software; you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation; either version 2 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program; if not, write to the Free Software
+#    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA

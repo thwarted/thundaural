@@ -1,46 +1,69 @@
 #!/usr/bin/perl
 
-package Logger;
+# $Header: /home/cvs/thundaural/server/Thundaural/Logger.pm,v 1.2 2004/05/30 09:15:52 jukebox Exp $
+
+package Thundaural::Logger;
+
+use Exporter;
+@ISA = qw(Exporter);
+@EXPORT_OK = qw(logger);
 
 use Sys::Syslog;
 use File::Basename;
+use IO::Handle;
 
-my $dest;
-BEGIN {
-	$dest = 0;
+my $FH;
+my $mode;
+my $configured = 0;
 
-	foreach my $a (@ARGV) {
-		if ($a =~ m/^--syslog$/) {
-			$dest = 0;
-			next;
+sub init {
+	$mode = shift;
+	if (!$configured) {
+		if (defined($mode) && $mode) {
+			if ($mode eq 'syslog') {
+				_open_syslog();
+			} elsif ($mode eq 'stderr') {
+				_open_stderr();
+			} else {
+				_open_file($mode);
+			}
+		} else {
+			_open_stderr();
 		}
-        	if ($a =~ m/^--stderr$/) {
-			$dest = 1;
-                	next;
-        	}
-	}
-	
-	if ($dest == 0) {
-		my $program = File::Basename::basename($0);
-		openlog($program, 'cons,pid', 'user');
+		$configured++;
 	}
 }
 
-END {
-	closelog();
+sub _open_syslog {
+	my $program = File::Basename::basename($0);
+	openlog($program, 'cons,pid', 'user');
+}
+
+sub _open_stderr {
+	$FH = *STDERR;
+	$mode = 'file';
+}
+
+sub _open_file {
+	my $file = shift;
+	open($FH, ">>$file") || die("unable to open $file for writing\n");
+	$mode = 'file';
 }
 
 sub logger {
         my($package, $filename, $line) = caller(0);
         my(undef, undef, undef, $subroutine) = caller(1);
+	if ($subroutine eq '(eval)') {
+        	(undef, undef, undef, $subroutine) = caller(2);
+	}
 	$subroutine = $package if (!$subroutine);
         my $prefix = "$subroutine($line)";
         my $format = shift;
         $msg = sprintf($format, @_);
-	if ($dest == 0) {
+	if ($mode eq 'file') {
+        	printf $FH "\%s: \%s\n", $prefix, $msg;
+	} else {
 		syslog('info', '%s: %s', $prefix, $msg);
-	} elsif ($dest == 1) {
-        	printf STDERR "\%s: \%s\n", $prefix, $msg;
 	}
 }
 

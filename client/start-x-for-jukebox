@@ -7,5 +7,5 @@ if [ "x$USER" = "x" ]; then
   echo "$0: specify user to run as for first argument"
   exit 1
 fi
-/usr/bin/su - $USER -c "xinit '$DIR/xinitrc.sh'"
+/usr/bin/su - $USER -c "xinit '$DIR/xinitrc.sh'" > /dev/null 2>&1
 sleep 4

@@ -1,6 +1,11 @@
 #!/usr/bin/perl
 
-package ServerCommands;
+# $Header: /home/cvs/thundaural/server/Thundaural/Server/ServerCommands.pm,v 1.5 2004/06/06 03:16:36 jukebox Exp $
+
+package Thundaural::Server::ServerCommands;
+
+# this file implements all the client usable commands
+# it is pretty closely tied to other parts of the server
 
 use strict;
 use warnings;
@@ -9,19 +14,18 @@ use threads;
 use threads::shared;
 
 use DBI;
-#use Safe;
+use Storable qw(freeze thaw);
 
-use Settings;
-use Logger;
+use Thundaural::Server::Settings;
+use Thundaural::Logger qw(logger);
 
 my $PROTOCOL_VERSION = '4';
 
 my $BIN_DF = '/bin/df';
 
-# $Header: /home/cvs/thundaural/server/ServerCommands.pm,v 1.18 2004/03/28 02:54:58 jukebox Exp $
-
 my @cmds = sort qw/pause skip tracks queued devices play albums quit help edit version
-		noop volume status who name rip abort stats randomize coverart checksum/;
+		noop volume status who name rip abort stats randomize coverart checksum
+		top/;
 
 my $in_checksum = 0;
 
@@ -32,7 +36,7 @@ sub new {
 	my $this = {};
 	bless $this, $class;
 
-	$this->{-dbfile} = $opts{-dbfile};
+	$this->{-dbfile} = Thundaural::Server::Settings::dbfile();
 	die("no dbfile specified") if (!$this->{-dbfile});
 	die("unable to locate dbfile ".$this->{-dbfile}) if (!-e $this->{-dbfile});
 
@@ -46,9 +50,9 @@ sub new {
 	foreach my $device (keys %{$this->{-playerthrs}}) {
 		if (!defined($this->{-playerthrs}->{$device}->{-object}->{-cmdqueue}) || 
 		    !$this->{-playerthrs}->{$device}->{-object}->{-cmdqueue}->isa('Thread::Queue')) {
-			Logger::logger("didn't pass valid cmdqueue, remote control will be disabled for $device");
+			logger("didn't pass valid cmdqueue, remote control will be disabled for $device");
 		} else {
-			Logger::logger("$device has a valid playercmds queue");
+			logger("$device has a valid playercmds queue");
 		}
 	}
 
@@ -57,9 +61,9 @@ sub new {
 	foreach my $device (keys %{$this->{-readerthrs}}) {
 		if (!defined($this->{-readerthrs}->{$device}->{-object}->{-cmdqueue}) || 
 		    !$this->{-readerthrs}->{$device}->{-object}->{-cmdqueue}->isa('Thread::Queue')) {
-			Logger::logger("didn't pass valid cmdqueue, remote control will be disabled for $device")
+			logger("didn't pass valid cmdqueue, remote control will be disabled for $device")
 		} else {
-			Logger::logger("$device has a valid readercmds queue");
+			logger("$device has a valid readercmds queue");
 		}
 	}
 
@@ -67,9 +71,9 @@ sub new {
 
 	if (!defined($this->{-periodic}->{-cmdqueue}) ||
 	    !$this->{-periodic}->{-cmdqueue}->isa('Thread::Queue')) {
-	    	Logger::logger("periodic task object doesn't have valid command queue");
+	    	logger("periodic task object doesn't have valid command queue");
 	} else {
-		Logger::logger("periodic task object has a valid cmdqueue");
+		logger("periodic task object has a valid cmdqueue");
 	}
 
 	$this->{-dbh} = DBI->connect("dbi:SQLite:dbname=".$this->{-dbfile},"","");
@@ -92,8 +96,15 @@ sub process {
 	if ($word) {
 		my $c = "\$this->cmd_$word(\$args, \$fh, \$connections);";
 		my @ret = eval $c;
-		if ($@ =~ m/Can't locate object method/) {
-			return (400, ["400 unknown command \"$word\"\n"]);
+		if ($@) {
+                        # should make sure that this error is from trying to invoke the
+                        # command method explictly, rather than just catching all
+                        # errors from missing methods
+			if ($@ =~ m/Can't locate object method/) {
+				return (400, ["400 unknown command \"$word\"\n"]);
+			}
+			chomp $@;
+			return (500, ["500 internal error $@\n"]);
 		}
 		return @ret;
 	}
@@ -116,7 +127,6 @@ sub cmd_who {
 	$x =~ s/\%d/\%s/g;
 	foreach my $c (keys %$connections) {
 		next if ($c eq 'server');
-		#print "$c = ".$connections->{$c}->{connectedat}."\n";
 		push(@r, sprintf $f, $connections->{$c}->{peername},
 				    ($connections->{$c}->{name} || ''),
 				    ($connections->{$c}->{inputs} || 0),
@@ -216,7 +226,7 @@ sub cmd_coverart {
 	my($ai, $caf);
 
 	if ($albumid eq 'ripping') {
-		my $sd = Settings::storagedir();
+		my $sd = Thundaural::Server::Settings::storagedir();
 		my @cas = ();
 		if (opendir(DIR, $sd)) {
 			@cas = grep { /coverart/ && -f "$sd/$_" } readdir(DIR);
@@ -244,7 +254,7 @@ sub cmd_coverart {
 
 		return (400, "400 album $albumid does not have cover art\n") if (!$caf);
 
-		$caf = sprintf('%s/%s', Settings::storagedir(), $caf);
+		$caf = sprintf('%s/%s', Thundaural::Server::Settings::storagedir(), $caf);
 		return (400, "400 cover art file is empty or non-existant\n") if (! -s $caf);
 	}
 
@@ -327,7 +337,7 @@ sub cmd_stats {
 	$v{'uptime-client'} = time() - int($connections->{$thisclient}->{connectedat});
 	eval {
 		# it would be cool if we used statfs(2) here
-		my $sd = Settings::storagedir();
+		my $sd = Thundaural::Server::Settings::storagedir();
 		my @x = `$BIN_DF $sd`;
 		#Filesystem           1K-blocks      Used Available Use% Mounted on
 		#/dev/hda8             32589620   7906656  23027468  26% /home
@@ -400,9 +410,9 @@ sub cmd_volume {
 	if (!$this->_is_valid_devicename_for_type($d, 'mixer')) {
 		return (400, "401 unknown mixer devicename\n");
 	}
-	my $qcmd = Settings::get('volumequery', 'command');
+	my $qcmd = Thundaural::Server::Settings::command('volumequery');
 	return (400, "400 error occured getting query command configuration\n") if (!$qcmd);
-	my $mixer = Settings::get($d, 'mixer');
+	my $mixer = Thundaural::Server::Settings::get($d, 'mixer');
 	return (400, "400 error occured getting mixer configuration\n") if (!$mixer);
 	$qcmd =~ s/\${DEVICEFILE}/$mixer/g;
 
@@ -411,7 +421,7 @@ sub cmd_volume {
 		if ($newvol !~ m/[+-]?\d+/) {
 			return (400, "400 invalid volume value \"$newvol\"\n");
 		}
-		my $scmd = Settings::get('volumeset', 'command');
+		my $scmd = Thundaural::Server::Settings::command('volumeset');
 		if (!$scmd) {
 			return (400, "400 error occured getting set command configuration\n");
 		}
@@ -456,29 +466,37 @@ sub cmd_status {
 
 	my @r = ();
 	my @keys = qw/devicename type state volume trackref performer name popularity rank length trackid started current percentage/;
-	my $outputs = Settings::get_of_type('play');
+	my $outputs = Thundaural::Server::Settings::get_of_type('play');
 
-	foreach my $o (@$outputs) {
-		my(@v, $c, $l, $p, $t, $a, $r, $tr);
-		my $dev = $o->{devicename};
+	#foreach my $o (@$outputs) {
+	foreach my $dev (keys %{$this->{-playerthrs}}) {
+		my(@v, $c, $l, $p, $t, $a, $r, $tr, $x);
+		#my $dev = $o->{devicename};
 		my $pvo = $this->{-playerthrs}->{$dev}->{-object};
 
-		my $qcmd = Settings::get('volumequery', 'command');
+		my $qcmd = Thundaural::Server::Settings::command('volumequery');
 		return (400, "400 error occured getting query command configuration\n") if (!$qcmd);
-		my $mixer = Settings::get($dev, 'mixer');
+		my $mixer = Thundaural::Server::Settings::get($dev, 'mixer');
 		return (400, "400 error occured getting mixer configuration\n") if (!$mixer);
 		$qcmd =~ s/\${DEVICEFILE}/$mixer/g;
 		my $curvolsetting = $this->_parse_aumix_output($qcmd);
 
-		if (my $x = $pvo->position()) {
-			($c, $l, $p) = split(/\t/, $x);
+		$x = $pvo->position();
+		if ($x && ($x = thaw($x)) ) {
+			#$x = thaw($x);
+			$c = $x->{current};
+			$l = $x->{length};
+			$p = $x->{percentage};
+			#($c, $l, $p) = split(/\t/, $x);
 		}
 		if (!$c || !$l || !$p) {
 			($c, $l, $p) = ('', '', '');
 		}
-		my $x = $pvo->track();
-		if ($x) {
-			($t, $a) = split(/\t/, $x);
+		$x = $pvo->track();
+		if ($x && ($x = thaw($x)) ) {
+			$t = $x->{trackid};
+			$a = $x->{started};
+			#($t, $a) = split(/\t/, $x);
 			lock(${$this->{-dblock}});
 			#my $q = "select * from tracks t left join genres g on t.genreid = g.genreid where trackid = ? limit 1";
 			my $q = "select *, p.name as performer, t.name as trackname 
@@ -509,13 +527,13 @@ sub cmd_status {
 			$l,
 			$t,
 			$a,
-			$c,
-			$p,
+			sprintf('%.3f', ($c || 0)),
+			sprintf('%.2f', ($p || 0)),
 		);
 		push(@r, join("\t", @v)."\n");
 	}
 
-	my $inputs = Settings::get_of_type('read');
+	my $inputs = Thundaural::Server::Settings::get_of_type('read');
 	foreach my $i (@$inputs) {
 		my(@v, $c, $l, $p, $t, $a, $r, $tr);
 		my $dev = $i->{devicename};
@@ -583,7 +601,7 @@ sub cmd_abort {
 		my $state = $rvo->state();
 		if ($state ne 'idle') {
 			if (ref($rvo->cmdqueue()) eq 'Thread::Queue') {
-				$rvo->cmdqueue()->enqueue('abort');
+				$rvo->cmdqueue()->enqueue('abortrip');
 				return (200, "200 aborting rip\n");
 			} else {
 				return (500, "500 internal error, $devicename reader doesn't have a valid command queue\n");
@@ -784,6 +802,36 @@ sub cmd_tracks {
 	return $this->_format_list(201, "trackref performer name length trackid popularity rank", [@r]);
 }
 
+sub cmd_flush {
+	my $this = shift;
+	my $input = shift;
+
+	if ($input =~ m/^help/) {
+		return (200, "200 flush <devicename> - attempt to flush all the songs queued up on <devicename>\n");
+	}
+	my @x = split(/\s+/, $input);
+	my $devicename = shift @x;
+	if (!$devicename) {
+		return (400, "401 missing devicename\n");
+	}
+	if (!$this->_is_valid_devicename_for_type($devicename, 'play')) {
+		return (400, "401 unknown play devicename\n");
+	}
+	my $q = "select count(1) from playhistory where devicename = ? and action = ?";
+	lock(${$this->{-dblock}});
+	my $sth = $this->{-dbh}->prepare($q);
+	$sth->execute($devicename, 'queued');
+	my($c) = $sth->fetchrow_array();
+	$sth->finish;
+	if ($c) {
+		my $q = "update playhistory set action = ?, actedat = ? where action = ? and devicename = ?";
+		my $sth = $this->{-dbh}->prepare($q);
+		$sth->execute('flushed', time(), 'queued', $devicename);
+		$sth->finish;
+	}
+	return (200, "200 $c queued songs flushed from queue $devicename\n");
+}
+
 sub cmd_queued {
 	my $this = shift;
 	my $input = shift;
@@ -830,13 +878,13 @@ sub _is_valid_devicename_for_type($$) {
 	my $devicename = shift;
 	my $type = shift;
 
-	return Settings::get($devicename, $type);
+	return Thundaural::Server::Settings::get($devicename, $type);
 }
 
 sub _default_playdevice {
 	my $this = shift;
 
-	return Settings::default_play_device();
+	return Thundaural::Server::Settings::default_play_device();
 }
 
 sub cmd_devices {
@@ -850,14 +898,14 @@ sub cmd_devices {
 	my @x = split(/\s+/, $input);
 	my $type = shift @x;
 
-	my $r = Settings::get_of_type($type);
+	my $r = Thundaural::Server::Settings::get_of_type($type);
 	my $total = 0;
 	my @r = ();
 	foreach my $rx (@$r) {
-		if ($rx->{type} ne 'command' && $rx->{type} !~ m/^_/) {
+		#if ($rx->{type} ne 'command' && $rx->{type} !~ m/^_/) {
 			# don't print commands, we should keep those private
 			push(@r, sprintf("%s\t%s\n", $rx->{devicename}, $rx->{type}));
-		}
+		#}
 		$total++;
 	}
 	return $this->_format_list(201, "devicename type", [@r]);
@@ -917,7 +965,7 @@ sub cmd_album {
 	my $this = shift;
 	my $input = shift;
 
-	return $this->xcmd_albums($input);
+	return $this->cmd_albums($input);
 }
 
 sub cmd_albums {
@@ -955,6 +1003,37 @@ sub cmd_albums {
 	return $this->_format_list(201, "albumid performer name length tracks sortname", [@r]);
 }
 
+sub cmd_top {
+	my $this = shift;
+	my $input = shift;
+
+	if ($input =~ m/^help/) {
+		return (200, "200 top <count> [ performers ] - dump ranking information\n");
+	}
+
+	lock(${$this->{-dblock}});
+	my $format = "performerid name tracksplayed";
+	my @r = ();
+	if ($input =~ m/^(\d+)\s+performers?/) {
+		my $limit = $1;
+		$limit += 0;
+		$limit = 25 if ($limit < 1);
+		$limit = 150 if ($limit > 150);
+		my $q = "select * from performer_ranking order by 1 desc limit $limit";
+		my $sth = $this->{-dbh}->prepare($q);
+		$sth->execute;
+		while(my $a = $sth->fetchrow_hashref()) {
+			my $x = sprintf("%d\t%s\t%d\n", $a->{performerid}, $a->{name}, $a->{tracksplayed});
+			push(@r, $x);
+		}
+		$sth->finish;
+	} else {
+		return (400, "400 unknown top listing \"$input\"\n");
+	}
+
+	return $this->_format_list(201, $format, [@r]);
+}
+
 sub cmd_quit {
 	my $this = shift;
 	my $input = shift;
@@ -989,6 +1068,7 @@ sub cmd_help {
 	foreach my $c (@cmds) {
 		my $c = "\$this->cmd_$c('help');";
 		my($ret, $lines) = eval $c;
+		$ret = $ret ? $ret+0 : 0;
 		next if ($ret > 299);
 		if (ref($lines) ne 'ARRAY') {
 			push(@r, $lines);
@@ -1118,6 +1198,23 @@ sub _format_list {
 
 1;
 
+#    Thundaural Jukebox
+#    Copyright (C) 2003-2004  Andrew A. Bakun
+#
+#    This program is free software; you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation; either version 2 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program; if not, write to the Free Software
+#    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
 __END__
 
 	$this->{-sqlvariables} = {};
@@ -1125,7 +1222,7 @@ __END__
 			my $name = shift; 
 			my $value = shift; 
 			$this->{-sqlvariables}->{$name} = $value; 
-			Logger::logger("setval($name, $value)");
+			logger("setval($name, $value)");
 			return $value; 
 		}, 'create_function' );
 	$this->{-dbh}->func('nextval', 1, sub { 
@@ -1134,6 +1231,6 @@ __END__
 				$this->{-sqlvariables}->{$name} = 0;
 			}
 			my $v = $this->{-sqlvariables}->{$name}++;
-			Logger::logger("nextval($name) = $v");
+			logger("nextval($name) = $v");
 			return $v; 
 		}, 'create_function' );

@@ -3,8 +3,8 @@ course, available to help you with installation.  You can contact me at
     ta at thwartedefforts dot org
 or on ICQ at 240033388.
 
-More dependancies are listed on the website.
-http://thwartedefforts.org/jukebox/
+Check the file INSTALL_LIBS_AND_MODULES for dependancies.  More dependancies 
+are listed on the website.  http://thwartedefforts.org/jukebox/
 
 You might want to install dagrab for ripping CDs.  I've had extremely good 
 experiences with it.  We'll fall back on cdda2wav and cdparanoia if you 
@@ -14,23 +14,16 @@ http://vertigo.fme.vutbr.cz/~stibor/dagrab.html
 ***************************** IMPORTANT *********************************
 First thing you want to do is run the checkdeps script.  It will tell you
 if you are missing something.  It will generate a file named 
-TAProgramLocations.pm, which you should move into the server directory.
+thundaural-server.conf, which you should move either into the server 
+directory or rename to /etc/thundaural/server.conf.
 Some of the stuff you need to do is covered below, so be sure to read
 this entire file.
 ***************************** IMPORTANT *********************************
 
-Be sure you install ogg123 patched to include the --remote option.  Once
-you patch it for that, be sure to patch it with my patch to fix a problem
-with the --remote option.  More information is available on the 
-Thundaural download page.
-
-
-Review server/Settings.pm.  Hopefully the paths you need to make
-or change will be obvious.  Version 1.5, with the way the checkdeps
-script generates TAProgramLocations.pm, means there is less to check for
-required modifications in Settings.pm.  What you want to be sure of is
-that the device files for your sound output (/dev/dsp) and cdrom drive
-(/dev/cdrom) are correct.
+After running checkdeps, review the thundaural-server.conf file.  You
+especially want to make sure that the paths to the device files are correct,
+and that the device files are accessible by the UNIX user who will be running
+the server.
 
 
 copy server/usr-local-lib-php/* to /usr/local/lib/php
@@ -50,13 +43,16 @@ permissions as /home/storage
 In version 1.4, the server was modified to create the necessary database
 structure if the datafile is empty.  All that is required is that the
 /home/storage/db directory be created and be acccessible.
-Version 1.5 saw some serious database changes, but the server is designed
+Later versions can some serious database changes, but the server is designed
 to upgrade the database schema to the latest version automaticly, without
 losing any data.
 
 The server/ripdisc.pl script uses cdda2wav and oggenc, you'll need to
 have those installed, along with XML::Ximple (for the MusicBrainz
 module) CDDB_get (for the FreeDB module). Both are available on CPAN).
+I recommend you also install dagrab, which seems to work better than
+cdda2wav.
+
 
 You can use the checkdeps script to see if everything is installed.  
 Please let me know if I missed anything.  If checkdeps doesn't report
@@ -84,5 +80,5 @@ That should be it.  You'll have to rip some CDs using the in-system CD
 ripper before you can start playing anything (in the works is import
 functionality).
 
-$Header: /home/cvs/thundaural/INSTALL,v 1.8 2004/03/27 09:45:23 jukebox Exp $
+$Header: /home/cvs/thundaural/INSTALL,v 1.10 2004/06/10 05:56:00 jukebox Exp $
 

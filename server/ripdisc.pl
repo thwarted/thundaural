@@ -1,28 +1,32 @@
 #!/usr/bin/perl
 
-# $Header: /home/cvs/thundaural/server/ripdisc.pl,v 1.13 2004/03/21 06:00:02 jukebox Exp $
+# $Header: /home/cvs/thundaural/server/ripdisc.pl,v 1.22 2004/06/10 05:58:19 jukebox Exp $
 
 use strict;
 use warnings;
 
-use TAProgramLocations;
-
 use Data::Dumper;
+use Getopt::Long;
+use File::Glob ':glob';
+use Storable qw(freeze thaw);
 
-$| = 1;
+BEGIN {
+	# redirect STDERR to STDOUT -- avoid having to 
+	# invoke a shell in the caller to do redirection
+	select STDERR; $| = 1; select STDOUT; $| = 1; 
+	open(STDERR, '>&=STDOUT');
+}
 
 # order is important here.  They'll be queried in the order specified
 # and the first one to succeed will be used.
 my $cdinfo_modules = ['MusicBrainzRemote', 'FreeDB'];
-#my $cdinfo_modules = ['FreeDB'];
 
 my $sx = {};
 my $taversion = "Thundaural v1.5 Audio Ripper";
-my $accepteddbversion = 3;
-my $bin_rm = TAProgramLocations::rm();
+my $accepteddbversion = 5;
 my $bin_getcoverart = './getcoverart.php';
 
-use TARipUtil;
+use Thundaural::Util;
 use DBI;
 my $dbh;
 
@@ -49,7 +53,7 @@ my $cdinfo = &get_audiocd_info;
 	# get the coverart
 	my($catemp, $coverartfile);
 	{
-		$catemp = TARipUtil::mymktempname(
+		$catemp = Thundaural::Util::mymktempname(
 			$sx->{storagedir},
 			$sx->{cddevice},
 			sprintf('disc%s.coverart.jpg', $cdinfo->{cddbid})
@@ -59,10 +63,11 @@ my $cdinfo = &get_audiocd_info;
 		my $cadir = sprintf('coverart/%s', &get_sort_dir($cdinfo->{album}->{performersort}));
 		mkdir(sprintf('%s/coverart', $sx->{storagedir}), 0777);
 		mkdir(sprintf('%s/%s', $sx->{storagedir}, $cadir), 0777);
-		$coverartfile = sprintf('%s/%s - %s - coverart.jpg', 
+		$coverartfile = sprintf('%s/%s - %s - %s - coverart.jpg', 
 					$cadir,
 					$cdinfo->{album}->{performer}, 
-					$cdinfo->{album}->{albumname}
+					$cdinfo->{album}->{albumname},
+                                        $cdinfo->{cddbid}
 				);
 
 		my $artist = $cdinfo->{album}->{performer};
@@ -143,7 +148,7 @@ my $cdinfo = &get_audiocd_info;
 				$undorenames->{$newcafile} = $catemp;
 				my $q = "insert into albumimages (albumid, label, preference, filename) values (?, ?, ?, ?)";
 				my $sth = $dbh->prepare($q);
-				eval { $sth->execute($albumid, 'front', 1, $coverartfile); };
+				eval { $sth->execute($albumid, 'front cover', 1, $coverartfile); };
 				my $e = $@;
 				$sth->finish;
 				if ($e) {
@@ -161,6 +166,13 @@ my $cdinfo = &get_audiocd_info;
 				#$failed = "missing track file for track $albumorder";
 				#last TRANSACTION;
 			}
+                        if (! -e $track->{filename} && 
+                            ! -s $track->{filename} && 
+                            $track->{trackname} =~ m/data.+track/i) {
+                                next;
+                                # found a data track that refused to be ripped
+                                # don't consider this an error, just skip it
+                        }
 			my $sortdir = $track->{sortdir};
 			my $destdir = sprintf('%s/%s', $sx->{storagedir}, $sortdir);
 			mkdir($destdir, 0777);
@@ -235,7 +247,7 @@ sub performer_id {
 	if ($perfid = &performer_id_add($perf, $perfsort)) {
 		return $perfid;
 	}
-	die("unable to add performer\n");
+	&mydie("unable to add performer\n");
 }
 
 sub performer_id_lookup {
@@ -251,7 +263,7 @@ sub performer_id_lookup {
 	};
 	$e = $@;
 	$sth->finish;
-	die($e) if ($e);
+	&mydie("database error $e") if ($e);
 	return $perfid ? $perfid : undef;
 }
 
@@ -267,7 +279,7 @@ sub performer_id_add {
 	};
 	$e = $@;
 	$sth->finish;
-	die($e) if ($e);
+	&mydie("database error $e") if ($e);
 	$q = "select last_insert_rowid()";
 	$sth = $dbh->prepare($q);
 	my $perfid;
@@ -277,21 +289,25 @@ sub performer_id_add {
 	};
 	$e = $@;
 	$sth->finish;
-	die($e) if ($e);
+	&mydie("database error $e") if ($e);
 	return $perfid ? $perfid : undef;
 }
 
 sub already_have_album {
 	my $cdinfo = shift;
-	my($id, $albumid);
+	my($id, $albumid, $e);
 
 	# check cdindexid
 	if (defined($id = $cdinfo->{cdindexid})) {
 		my $q = "select albumid from albums where cdindexid = ? limit 1";
 		my $sth = $dbh->prepare($q);
-		$sth->execute($id);
-		($albumid) = $sth->fetchrow_array();
+		eval {
+			$sth->execute($id);
+			($albumid) = $sth->fetchrow_array();
+		};
+		$e = $@;
 		$sth->finish;
+		&mydie("database error $e") if ($e);
 	}
 	return $albumid if ($albumid);
 
@@ -299,9 +315,13 @@ sub already_have_album {
 	if (defined($id = $cdinfo->{cddbid})) {
 		my $q = "select albumid from albums where cddbid = ? limit 1";
 		my $sth = $dbh->prepare($q);
-		$sth->execute($id);
-		($albumid) = $sth->fetchrow_array();
+		eval {
+			$sth->execute($id);
+			($albumid) = $sth->fetchrow_array();
+		};
+		$e = $@;
 		$sth->finish;
+		&mydie("database error $e") if ($e);
 	}
 	return $albumid if ($albumid);
 
@@ -324,7 +344,7 @@ sub rip_tracks {
 		$dorip =~ s/\$cddevice/$sx->{cddevice}/g;
 		$dorip =~ s/\$track/$tracknum/g;
 
-		my $outfile = TARipUtil::mymktempname(
+		my $outfile = Thundaural::Util::mymktempname(
 				$sx->{storagedir}, 
 				$sx->{cddevice}, 
 				sprintf('disc%s.track%02d.ogg', $cdinfo->{cddbid}, $tracknum)
@@ -341,6 +361,7 @@ sub rip_tracks {
 		my $cdindexid = $cdinfo->{cdindexid};
 		my $album = $cdinfo->{album}->{albumname};
 		my $tracklen = $track->{sectors} / 75; # in seconds
+		my $metasource = $cdinfo->{source};
 		if (int($tracklen) != $tracklen) {
 			$tracklen = int($tracklen);
 			$tracklen++; # final second is not a whole second, just add one
@@ -351,6 +372,7 @@ sub rip_tracks {
 		$doenc =~ s/\$taversion\b/$taversion/g;
 		$doenc =~ s/\$cdindexid\b/$cdindexid/g;
 		$doenc =~ s/\$cddbid\b/$cddbid/g;
+		$doenc =~ s/\$metasource\b/$metasource/g;
 
 		#print "\nrunning\n\t$dorip\n\t$doenc\n";
 		my $cmd = "( $dorip 2>/dev/null ) | ( $doenc 2>&1 ) |";
@@ -375,52 +397,60 @@ sub rip_tracks {
 		my $runtime = time() - $startat;
 		$track->{filename} = $outfile;
 		$track->{sortdir} = &get_sort_dir($track->{performersort});
-		$track->{finalfilename} = sprintf("%s - %s - %s.ogg", $artist, $album, $title);
+		$track->{finalfilename} = sprintf("%s :: %s :: %02d :: %s.ogg", &unslash($artist), &unslash($album), $tracknum, &unslash($title));
 	}
+}
+
+sub unslash {
+	my $x = shift;
+	$x =~ s!/!-!g;
+	return $x;
 }
 
 sub parse_command_line {
-	while(@_) {
-		my $a = shift @_;
-		if ($a =~ m/^--device/) {
-			$sx->{cddevice} = shift @_;
-			die("$0: missing argument to --device\n")
-				unless ($sx->{cddevice});
-			next;
-		}
-		if ($a =~ m/^--storagedir/) {
-			$sx->{storagedir} = shift @_;
-			die("$0: missing argument to --storagedir\n")
-				unless ($sx->{storagedir});
-			next;
-		}
-		if ($a =~ m/^--dbfile/) {
-			$sx->{sqlitedb} = shift @_;
-			die("$0: missing argument to --dbfile\n")
-				unless ($sx->{sqlitedb});
-			next;
-		}
-		die("Usage: $0 --device <cdrom device> --storagedir <storagedir> --dbfile <path to database>\n");
-	}
+	$sx->{output} = "text";
+	my %options = (
+		'output=s'=>\($sx->{output}),
+		'prog=s'=>\&set_prog,
+		'device=s'=>\($sx->{cddevice}),
+		'storagedir=s'=>\($sx->{storagedir}),
+		'dbfile=s'=>\($sx->{dbfile})
+	);
+	&mydie("invoked with invalid arguments")
+		unless GetOptions(%options);
+	&mydie("'storable' and 'text' are the only allowed arguments to output\n")
+		if ($sx->{output} !~ m/^(storable|text)$/);
 }
 
+sub set_prog {
+	my $opt = shift;
+	my $value = shift;
+                                                                                                                                                       
+	my($p, $path) = $value =~ m/^(\w+):(.+)$/;
+	&mydie("$path is not executable\n") unless (-x $path);
+	$sx->{_progs}->{$p} = $path;
+}
+
+
 sub verify_settings {
-	die("$0: missing --storagedir argument\n") unless ($sx->{storagedir});
-	die("$0: specified storagedir (".$sx->{storagedir}.") is not an accessible directory.\n")
+	&mydie("missing --storagedir argument\n") unless ($sx->{storagedir});
+	&mydie("specified storagedir (".$sx->{storagedir}.") is not an accessible directory.\n")
 		unless( -d $sx->{storagedir} &&
 			-r $sx->{storagedir} &&
 			-w $sx->{storagedir});
 
-	die("$0: missing --device argument\n") unless ($sx->{cddevice});
-	die("$0: specified cdrom device (".$sx->{cddevice}.") is not readable\n")
+	&mydie("missing --device argument\n") unless ($sx->{cddevice});
+	&mydie("specified cdrom device (".$sx->{cddevice}.") is not readable\n")
 		unless (-r $sx->{cddevice});
 
-	die("$0: missing --sqlitedb argument\n") unless ($sx->{sqlitedb});
-	die("$0: database (".$sx->{sqlitedb}.") has zero size\n") unless (-s $sx->{sqlitedb});
+	&mydie("missing --dbfile argument\n") unless ($sx->{dbfile});
+	&mydie("database (".$sx->{dbfile}.") doesn't exist\n") unless (-e $sx->{dbfile});
+	&mydie("database (".$sx->{dbfile}.") isn't a regular file\n") unless (-f $sx->{dbfile});
+	&mydie("database (".$sx->{dbfile}.") has zero size\n") unless (-s $sx->{dbfile});
 
 	# bind to database
-	$dbh = DBI->connect("dbi:SQLite:dbname=".$sx->{sqlitedb},'','',{RaiseError=>1, PrintError=>0, AutoCommit=>1})
-		or die(sprintf('%s: unable to bind to database: %s%s', $0, $DBI::errstr, "\n"));
+	$dbh = DBI->connect("dbi:SQLite:dbname=".$sx->{dbfile},'','',{RaiseError=>1, PrintError=>0, AutoCommit=>1})
+		or &mydie(sprintf('unable to bind to database: %s%s', $DBI::errstr, "\n"));
 
 	my $q = "select value from meta where name = 'dbversion'";
 	my $sth = $dbh->prepare($q);
@@ -431,7 +461,7 @@ sub verify_settings {
 		($dbversion) = $sth->fetchrow_array();
 	};
 	$sth->finish;
-	die("$0: database version ($dbversion) is not $accepteddbversion\n")
+	&mydie("database version mismatch, looking for $accepteddbversion, found $dbversion")
 		unless ($dbversion == $accepteddbversion);
 
 	#$dbh->trace(2);
@@ -447,15 +477,15 @@ sub get_audiocd_info {
 	#    call lookup method
 	#    fail, try next module
 	&dumpstatus('busy', 'reading CD info');
-	foreach my $module (@$cdinfo_modules) {
-		&dumpstatus('busy', "looking up CD info using $module");
+	foreach my $modulex (@$cdinfo_modules) {
+		&dumpstatus('busy', "looking up CD info using $modulex");
 		sleep 2;
-		$module = sprintf('TARipLookup%s', $module);
+		my $module = sprintf('Thundaural::Rip::Lookup%s', $modulex);
 		eval "use $module;";
 		if ($@) {
 			my $x = $@;
 			chomp $x;
-			&dumpstatus('busy', "including $module: $x");
+			&dumpstatus('busy', "including $modulex: $x");
 			sleep 2;
 			next;
 		}
@@ -472,11 +502,11 @@ sub get_audiocd_info {
 			next;
 		}
 		if (ref($album) eq 'HASH') {
-			my $pvtemp = TARipUtil::mymktempname($sx->{storagedir}, $sx->{cddevice}, 'discinfo.pv');
+			my $pvtemp = Thundaural::Util::mymktempname($sx->{storagedir}, $sx->{cddevice}, 'discinfo.pv');
 			open(X, ">$pvtemp");
 			print X Dumper($album)."\n";
 			close(X);
-			&dumpstatus('busy', "$module succeeded");
+			&dumpstatus('busy', "$modulex succeeded");
 			sleep 1;
 			return $album;
 		}
@@ -485,7 +515,7 @@ sub get_audiocd_info {
 }
 
 sub find_audio_ripper {
-	# order of priority, gotta have one of these
+	# in order of priority, gotta have one of these
 	my @progs = qw/
 		dagrab
 		cdda2wav
@@ -498,14 +528,14 @@ sub find_audio_ripper {
 	};
 
 	foreach my $p (@progs) {
-		my $px = `which $p 2>/dev/null`;
+		my $px = $sx->{_progs}->{$p};
 		if ($px) {
 			chomp $px;
 			my $px = sprintf('%s %s', $px, $progopts->{$p});
 			return $px;
 		}
 	}
-	&dumpstatus("idle", "unable to find an audio ripper (".join(', ', @progs).") in path");
+	&dumpstatus("idle", "unable to find an audio ripper (".join(', ', @progs).") (was --prog specified?)");
 	exit;
 }
 
@@ -516,18 +546,19 @@ sub find_audio_encoder {
 		'--title "$title"',
 		'--album "$album"',
 		'-c "RIPPER=$taversion"',
-		'-c "CDINDEXID=$cdindexid"',
-		'-c "CDDBID=$cddbid"',
+		'-c "ALBUMCDINDEXID=$cdindexid"',
+		'-c "ALBUMCDDBID=$cddbid"',
+		'-c "METASOURCE=$metasource"',
 		'--output="$outfile"',
 		'-'
 	);
 	my $opts = join(' ', @opts);
-	my $px = TAProgramLocations::oggenc();
+	my $px = $sx->{_progs}->{oggenc};
 	if ($px && -x $px) {
 		my $px = sprintf('%s %s', $px, $opts);
 		return $px;
 	}
-	&dumpstatus('idle', 'unable to find audio encoder oggenc');
+	&dumpstatus('idle', 'unable to find audio encoder (oggenc) (was --prog specified?)');
 	exit;
 }
 
@@ -542,7 +573,7 @@ sub abortus {
 sub pid_using_device($) {
 	my $d = shift;
 
-	my $p = TAProgramLocations::fuser();
+	my $p = $sx->{_progs}->{fuser};
 	return undef unless ($p);
 	my @x = `$p $d`;
 	if (@x) {
@@ -566,8 +597,11 @@ sub get_sort_dir {
 
 sub cleanup {
 	&dumpstatus("cleanup");
-	my $pattern = TARipUtil::tmpnameprefix($sx->{storagedir}, $sx->{cddevice}).'*';
-	`$bin_rm -f $pattern`;
+	my $pattern = Thundaural::Util::tmpnameprefix($sx->{storagedir}, $sx->{cddevice}).'*';
+	my @files = bsd_glob($pattern);
+	foreach my $f (@files) {
+		unlink($f) if (-f $f);
+	}
 	sleep 2;
 }
 
@@ -575,8 +609,17 @@ sub dumpstatus {
 	my($state, $volume, $trackref, $performer, $name, $popularity, $rank, $length, $trackid, $started, $current, $percentage) = @_;
 	push(@_, '', '', '', '', '', '', '', '', '', '', '', '', '');
 	my @x = @_[0..11];
-	print $sx->{cddevice}."\t".join("\t", @x)."\n";
+	my $dev = $sx->{cddevice} ? $sx->{cddevice} : '/dev/cdrom'; # use a rational default
+	print $dev."\t".join("\t", @x)."\n";
 	#print "$cddevice\t$state\t$volume\t$tracknum\t$artist\t$trackname\t$pct\t$corrections\n";
+}
+
+sub mydie {
+	my $msg = shift;
+	chomp $msg;
+	$msg =~ tr/\t\n/ /;
+	&dumpstatus('idle', sprintf('ripping failed with error "%s"', $msg));
+	exit 1;
 }
 
 # dagrab can calculate this for us, but we're using oggenc's output 
@@ -595,3 +638,19 @@ sub calc_speed($$) {
 	return $speed;
 }
 
+#    Thundaural Jukebox
+#    Copyright (C) 2003-2004  Andrew A. Bakun
+#
+#    This program is free software; you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation; either version 2 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program; if not, write to the Free Software
+#    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
