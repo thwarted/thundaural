@@ -27,8 +27,6 @@ sub widget_initialize {
 
     $this->SUPER::widget_initialize(@_);
 
-    $this->{server} = $main::client;
-
     $this->add_widget(new Themes::Original::AlbumPrev(name=>'albumprev'));
     $this->add_widget(new Themes::Original::AlbumNext(name=>'albumnext'));
     $this->add_widget(new Themes::Original::AlbumSlider(name=>'albumslider'));
@@ -49,7 +47,7 @@ sub widget_initialize {
 
     my $o = 0; # $this->{album_offset};
     my $c = 0;
-    my $start_albums = $this->{server}->albums(offset=>$this->{album_offset}, count=>$this->{albums_per_page});
+    my $start_albums = $main::client->albums(offset=>$this->{album_offset}, count=>$this->{albums_per_page});
     $this->{albumbuttons} = [];
     foreach my $pos (@{$positions}) {
         my($x, $y, $s) = @$pos;
@@ -78,7 +76,7 @@ sub page_size {
 
 sub total_albums {
     my $this = shift;
-    my $total = $this->{server}->albums_count();
+    my $total = $main::client->albums_count();
     return $total;
 }
 
@@ -91,7 +89,7 @@ sub adjust_album_offset {
 
     my $offset = $this->{album_offset};
     my $ooffset = $offset;
-    my $total = $this->{server}->albums_count();
+    my $total = $main::client->albums_count();
     if (defined($change)) {
         $offset += $change;
         if ($offset < 0) {
@@ -130,13 +128,13 @@ sub hide_nav_buttons {
     my $this = shift;
     
     my $offset = $this->{album_offset};
-    my $total = $this->{server}->albums_count();
+    my $total = $main::client->albums_count();
     my $max = $total - $this->{albums_per_page};
     $max = $total if ($max < $total);
 
-    logger("offset = $offset");
-    logger("total = $total");
-    logger("max = $max");
+    #logger("offset = $offset");
+    #logger("total = $total");
+    #logger("max = $max");
 
     if ($offset == 0 && $total < scalar @{$this->{albumbuttons}}) {
         $this->get_widget('albumprev')->visible(0);
@@ -161,7 +159,7 @@ sub update_albumbuttons {
     my $this = shift;
     my $offset = $this->{album_offset};
 
-    my $page_albums = $this->{server}->albums(offset=>$offset, count=>$this->{albums_per_page});
+    my $page_albums = $main::client->albums(offset=>$offset, count=>$this->{albums_per_page});
     my @buttons = @{$this->{albumbuttons}};
     map {
         my $w = $this->get_widget(shift @buttons);

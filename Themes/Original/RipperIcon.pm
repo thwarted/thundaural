@@ -28,7 +28,7 @@ sub widget_initialize {
 
     $this->add_frame(file=>'images/ripcdrom-idle.png', resize=>1);
     $this->add_frame(file=>'images/ripcdrom-busy.png', resize=>1);
-    $this->add_depressed_frame(file=>'images/ripcdrom-busy.png', resize=>1);
+    $this->add_depressed_frame(file=>'images/ripcdrom-idle.png', resize=>1);
     $this->add_depressed_frame(file=>'images/ripcdrom-busy.png', resize=>1);
 
     $this->SUPER::widget_initialize();

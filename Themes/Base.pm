@@ -77,7 +77,7 @@ sub request_blit {
         push(@{$this->{_t}->{blitqueue}}, [$name, $surface, $area, $sync]);
         return 1;
     } else {
-        cluck("surface ($surface) or area ($area) are false");
+        cluck("surface ($surface) or area ($area) are false for $name");
     }
     return 0;
 }

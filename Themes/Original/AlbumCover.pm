@@ -25,7 +25,6 @@ sub widget_initialize {
     $this->SUPER::widget_initialize(@_);
 
     my $area = $this->area();
-    $this->{server} = $main::client;
 
     $this->{bgcolor} = new SDL::Color(-r=>110, -g=>110, -b=>110);
     $this->{fgcolor} = new SDL::Color(-r=>255, -g=>255, -b=>255);
@@ -107,7 +106,7 @@ sub set_album {
         if (-e $outfile && $outfile eq $this->{lastdata} && -s $outfile == $this->{lastsize}) {
             # nothing to do
         } else {
-            my $x = $this->{server}->coverart(albumid=>'ripping', outputfile=>$outfile);
+            my $x = $main::client->coverart(albumid=>'ripping', outputfile=>$outfile);
             $this->set_frame(frame=>0, file=>$outfile, resize=>1);
             $this->make_depressed_frame();
             $this->{lastdata} = $outfile;

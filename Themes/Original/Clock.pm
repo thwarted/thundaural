@@ -28,8 +28,6 @@ sub widget_initialize {
     my $area = $this->area();
     $this->update_every(1000);
 
-    $this->{server} = $main::client;
-
     $this->{bgcolor} = new SDL::Color(-r=>160, -b=>160, -g=>160);
     $this->{fgcolor} = new SDL::Color(-r=>0, -b=>0, -g=>0);
 
@@ -40,7 +38,7 @@ sub widget_initialize {
 
 }
 
-sub draw_info {
+sub update {
     my $this = shift;
     my %o = @_;
     my $ticks = $o{ticks};

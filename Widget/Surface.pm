@@ -57,10 +57,10 @@ sub draw {
     my %o = @_;
 
     if ($this->should_draw(@_)) {
-        if ($this->{_s}->{lastupdate}) {
+        if (!$this->{_s}->{lastupdate}) {
             $o{force} = 1;
         }
-        if ($this->draw_info(%o)) {
+        if ($this->update(%o)) {
             if (ref($this->{_s}->{surface})) {
                 $this->{_s}->{lastupdate} = $o{ticks};
                 $this->erase();
@@ -73,7 +73,7 @@ sub draw {
         # well, the blitter in main won't attempt to draw a false surface
         if (!ref($this->{_s}->{surface})) {
             $o{force} = 1;
-            $this->draw_info(%o);
+            $this->update(%o);
         }
         $this->{_s}->{lastupdate} = $o{ticks};
         $this->erase();
@@ -81,7 +81,7 @@ sub draw {
     }
 
 #    if ($this->{_s}->{lastupdate} == -1) {
-#        $this->draw_info(@_);
+#        $this->update(@_);
 #        if (ref($this->{_s}->{surface})) {
 #            $this->{_s}->{lastupdate} = 1;
 #            $this->erase();
@@ -89,7 +89,7 @@ sub draw {
 #        }
 #    }
 #    if ($this->should_draw(@_)) {
-#        if ($this->draw_info(@_)) {
+#        if ($this->update(@_)) {
 #            $this->{_s}->{lastupdate} = $o{ticks};
 #            if (ref($this->{_s}->{surface})) {
 #                $this->erase();
@@ -118,11 +118,12 @@ sub surface {
 
     if (@_) {
         $this->{_s}->{surface} = shift @_;
+        croak("::surface called with non-SDL::Surface argument") if (ref($this->{_s}->{surface}) ne 'SDL::Surface');
     }
     return $this->{_s}->{surface};
 }
 
-sub draw_info {
+sub update {
     # child should override
     return 0;
 }

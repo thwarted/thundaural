@@ -28,8 +28,6 @@ sub widget_initialize {
     my $area = $this->area();
     $this->update_every(50); # force it to update as soon as possible
 
-    $this->{server} = $main::client;
-
     $this->{bgcolor} = new SDL::Color(-r=>140, -b=>140, -g=>140);
     $this->{fgcolor} = new SDL::Color(-r=>0, -b=>0, -g=>0);
     my $s = new SDL::Surface(-width=>$area->width(), -height=>$area->height(), -depth=>32);
@@ -42,17 +40,17 @@ sub widget_initialize {
 
 }
 
-sub draw_info {
+sub update {
     my $this = shift;
     my %o = @_;
     my $ticks = $o{ticks};
 
     $this->update_every(10000) if (!$this->{started}); # okay, we're going to update right after starting up, so reset this to a sane value
     $this->{started} = 1;
-    my @outputs = @{$this->{server}->devices('play')};
+    my @outputs = @{$main::client->devices('play')};
     my @lines = ();
     foreach my $device (@outputs) {
-        my $s = $this->{server}->will_random_play_until($device);
+        my $s = $main::client->will_random_play_until($device);
         my $m;
         if ($s) {
             $m = "$device will random play until ".localtime($s);

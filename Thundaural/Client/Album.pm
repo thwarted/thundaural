@@ -32,12 +32,11 @@ sub new {
 
     $this->{tmpdir} = $main::tmpdir;
     $this->{albumid} = $o{albumid};
-    $this->{server} = $main::client;
     $this->{info} = $o{info};
     $this->{tracks} = [];
 
     if (!$this->{info}) {
-        $this->{info} = $this->{server}->album_hash(albumid=>$this->{albumid});
+        $this->{info} = $main::client->album_hash(albumid=>$this->{albumid});
     }
     if (!$this->{albumid}) {
         if ($this->{info}->{type} eq 'read') {
@@ -75,7 +74,7 @@ sub tracklist {
         return [];
     }
     if (! (scalar @{$this->{tracks}}) ) {
-        my $x = $this->{server}->getlist('tracks', $this->{albumid});
+        my $x = $main::client->getlist('tracks', $this->{albumid});
         my @n = ();
         foreach my $t (@{$x}) {
             my $trk = new Thundaural::Client::Track(info=>$t);
@@ -92,7 +91,7 @@ sub coverartfile($) {
 
     my $tmpfile = $this->_coverart_localfile($albumid);
     if (! -s $tmpfile) {
-        my $x = $this->{server}->coverart(albumid=>$albumid, outputfile=>$tmpfile);
+        my $x = $main::client->coverart(albumid=>$albumid, outputfile=>$tmpfile);
         if (defined($x) && ($tmpfile eq $x)) {
             $this->{coverartfile} = $x;
             return $x;

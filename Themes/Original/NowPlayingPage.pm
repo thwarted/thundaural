@@ -28,8 +28,6 @@ sub widget_initialize {
 
     $this->SUPER::widget_initialize(@_);
 
-    $this->{server} = $main::client;
-
     my $bgcolor = new SDL::Color(-r=>140, -g=>140, -b=>140);
     my $halfbg = new SDL::Color(-r=>160, -g=>160, -b=>160);
     my $fgcolor = new SDL::Color(-r=>180, -g=>180, -b=>180);

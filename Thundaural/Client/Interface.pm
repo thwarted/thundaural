@@ -261,13 +261,12 @@ sub _do_cmd {
     RECONNECT:
     while (1) {
         $h = $this->_ensure_connect();
-        logger(">> $cmd");
+        #logger(">> $cmd");
         print $h "$cmd\n";
         $input = <$h>;
         next if (!defined($input));
         chomp $input;
-        logger("<< $input");
-        #print "input = \"$input\"\n";
+        #logger("<< $input");
         ($rescode, $more) = $input =~ m/^(\d{3}) (count|(\d+) bytes follow)?/;
         $rescode = 0 if !defined($rescode);
         if ($rescode == 202) { # binary data

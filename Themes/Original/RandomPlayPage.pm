@@ -25,9 +25,7 @@ sub widget_initialize {
 
     $this->SUPER::widget_initialize(@_);
 
-    $this->{server} = $main::client;
-
-    my $devices = $this->{server}->devices('play');
+    my $devices = $main::client->devices('play');
 
     my $buttonxpos = 10;
     foreach my $device (@$devices) {

@@ -109,8 +109,8 @@ sub heartbeat {
         }
     }
     my $w;
-    $w = $this->get_widget('IconNowPlaying')->animate($playing * 600);
-    $w = $this->get_widget('IconRipper')->animate($ripping * 600);
+    $w = $this->get_widget('IconNowPlaying')->animate($playing * 1000);
+    $w = $this->get_widget('IconRipper')->animate($ripping * 1000);
     return 3000;
 }
 

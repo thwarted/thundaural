@@ -35,6 +35,13 @@ sub widget_initialize {
 
     $this->{mode} = 'idle';
     $this->update_face($this->{mode});
+
+    $this->{for_device} = $this->{devices}->[0]; 
+    my $x = $main::client->devices('read');
+    if (scalar @$x) {
+        # only handles the first reading device
+        $this->{rip_device} = $x->[0];
+    }
 }
 
 sub update_face {
@@ -42,6 +49,7 @@ sub update_face {
     my $mode = shift;
 
     my $msg = $mode eq 'idle' ? 'start' : 'abort';
+    $this->{mode} = $mode;
     my $area = $this->area();
     my $fh = $this->{font}->height();
 
@@ -57,8 +65,18 @@ sub update_face {
 sub onClick {
     my $this = shift;
 
-    $this->{mode} = $this->{mode} eq 'idle' ? 'ripping' : 'idle';
-    $this->update_face($this->{mode});
+    #my $mode;
+    # toggle the mode
+    if ($this->{mode} eq 'idle') {
+        # start ripping
+        $main::client->rip($this->{rip_device});
+        #$mode = 'ripping';
+    } else {
+        $main::client->abort_rip($this->{rip_device});
+        #$mode = 'idle';
+    }
+    #$this->update_face($mode);
+    $this->container()->get_widget('rippinginfo')->update(continuous=>1);
 
 }
 
