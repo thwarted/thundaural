@@ -1,7 +1,5 @@
 #!/usr/bin/perl
 
-# $Header: /home/cvs/thundaural/server/ripdisc.pl,v 1.22 2004/06/10 05:58:19 jukebox Exp $
-
 use strict;
 use warnings;
 
@@ -34,12 +32,14 @@ my $dbh;
 &verify_settings;
 &cleanup;
 
-my $cdinfo = &get_audiocd_info;
+{
+    my $cdinfo = &get_audiocd_info;
 
     if (!defined($cdinfo)) {
         &dumpstatus("idle", "unable to get album information from disc");
         exit;
     }
+    &dump_discinfo($cdinfo, '1lookup');
 
     # do we already have this album ?
     if (&already_have_album($cdinfo)) {
@@ -51,43 +51,35 @@ my $cdinfo = &get_audiocd_info;
     $SIG{TERM} = \&abortus;
 
     # get the coverart
-    my($catemp, $coverartfile);
-    {
-        $catemp = Thundaural::Util::mymktempname(
-            $sx->{storagedir},
-            $sx->{cddevice},
-            sprintf('disc%s.coverart.jpg', $cdinfo->{cddbid})
-        );
-
-        #$coverartfile = sprintf("coverart/$sortdir/$artist - $albumtitle - $cddbid - coverart.jpg";
-        my $cadir = sprintf('coverart/%s', &get_sort_dir($cdinfo->{album}->{performersort}));
-        mkdir(sprintf('%s/coverart', $sx->{storagedir}), 0777);
-        mkdir(sprintf('%s/%s', $sx->{storagedir}, $cadir), 0777);
-        $coverartfile = sprintf('%s/%s - %s - %s - coverart.jpg', 
-                    $cadir,
-                    $cdinfo->{album}->{performer}, 
-                    $cdinfo->{album}->{albumname},
-                                        $cdinfo->{cddbid}
-                );
-
-        my $artist = $cdinfo->{album}->{performer};
-        $artist =~ s/"//g;
-        my $albumtitle = $cdinfo->{album}->{albumname};
-        $albumtitle =~ s/"//g;
-        my $cmd = "$bin_getcoverart \"$artist\" \"$albumtitle\" $catemp >/tmp/xx1 2>&1";
-        &dumpstatus('busy', "finding cover art for \"$artist - $albumtitle\"");
-        system($cmd);
-
-        open(W, ">>$catemp");
-        close(W);
-    }
+    my($catemp, $coverartfile) = &get_cover_art($cdinfo);
+    $cdinfo->{coverarttemp} = $catemp;
+    $cdinfo->{coverartfile} = $coverartfile;
+    &dump_discinfo($cdinfo, '2coverart');
 
     my $ripstart = time();
     &rip_tracks($cdinfo);
-    my $riptime = time() - $ripstart;
+    $cdinfo->{riptime} = time() - $ripstart;
+    &dump_discinfo($cdinfo, '3ripped');
 
-    #print Dumper($cdinfo);
+    my $failed = &add_album($cdinfo);
+    if ($failed) {
+        &dumpstatus('idle', sprintf('ripping "%s - %s" failed with error "%s"', $cdinfo->{album}->{performer}, $cdinfo->{album}->{albumname}, $failed));
+    } else {
+        &dumpstatus('idle', sprintf('ripping "%s - %s" successful', $cdinfo->{album}->{performer}, $cdinfo->{album}->{albumname}));
+    }
+}
 
+sub dump_discinfo {
+    my $cdinfo = shift;
+    my $mode = shift;
+    my $pvtemp = Thundaural::Util::mymktempname($sx->{storagedir}, $sx->{cddevice}, "discinfo-$mode.pv");
+    open(X, ">$pvtemp");
+    print X Dumper($cdinfo)."\n";
+    close(X);
+}
+
+sub add_album {
+    my $cdinfo = shift;
     my $q;
 
     $dbh->begin_work();
@@ -120,7 +112,7 @@ my $cdinfo = &get_audiocd_info;
                 $cdinfo->{'cdindexid'},
                 $cdinfo->{'cddbid'},
                 $cdinfo->{'totaltime'},
-                $riptime,
+                $cdinfo->{'riptime'},
                 $cdinfo->{'numtracks'},
                 $cdinfo->{'source'}
             );
@@ -140,16 +132,16 @@ my $cdinfo = &get_audiocd_info;
         if ($e) { $failed = "database update: $e"; last TRANSACTION; }
 
         # do the cover art
-        if (-s $catemp) {
-            my $newcafile = sprintf('%s/%s', $sx->{storagedir}, $coverartfile);
-            if (!(rename($catemp, $newcafile))) {
+        if (-s $cdinfo->{coverarttemp}) {
+            my $newcafile = sprintf('%s/%s', $sx->{storagedir}, $cdinfo->{coverartfile});
+            if (!(rename($cdinfo->{coverarttemp}, $newcafile))) {
                 $failed = "renaming cover art failed: $!";
                 last TRANSACTION;
             } else {
-                $undorenames->{$newcafile} = $catemp;
+                $undorenames->{$newcafile} = $cdinfo->{coverarttemp};
                 my $q = "insert into albumimages (albumid, label, preference, filename) values (?, ?, ?, ?)";
                 my $sth = $dbh->prepare($q);
-                eval { $sth->execute($albumid, 'front cover', 1, $coverartfile); };
+                eval { $sth->execute($albumid, 'front cover', 1, $cdinfo->{coverartfile}); };
                 my $e = $@;
                 $sth->finish;
                 if ($e) {
@@ -232,13 +224,48 @@ my $cdinfo = &get_audiocd_info;
         foreach my $utr (keys %{$undorenames}) {
             rename $utr, $undorenames->{$utr};
         }
-        &dumpstatus('idle', sprintf('ripping "%s - %s" failed with error "%s"', $cdinfo->{album}->{performer}, $cdinfo->{album}->{albumname}, $failed));
+        return $failed;
     } else {
         $dbh->commit();
-        &dumpstatus('idle', sprintf('ripping "%s - %s" successful', $cdinfo->{album}->{performer}, $cdinfo->{album}->{albumname}));
+        return 0;
     }
+}
 
 $dbh->disconnect;
+
+sub get_cover_art {
+    my $cdinfo = shift;
+
+    my $catemp = Thundaural::Util::mymktempname(
+        $sx->{storagedir},
+        $sx->{cddevice},
+        sprintf('disc%s.coverart.jpg', $cdinfo->{cddbid})
+    );
+
+    #$coverartfile = sprintf("coverart/$sortdir/$artist - $albumtitle - $cddbid - coverart.jpg";
+    my $cadir = sprintf('coverart/%s', &get_sort_dir($cdinfo->{album}->{performersort}));
+    mkdir(sprintf('%s/coverart', $sx->{storagedir}), 0777);
+    mkdir(sprintf('%s/%s', $sx->{storagedir}, $cadir), 0777);
+    my $coverartfile = sprintf('%s/%s - %s - %s - coverart.jpg', 
+            $cadir,
+            $cdinfo->{album}->{performer}, 
+            $cdinfo->{album}->{albumname},
+            $cdinfo->{cddbid}
+    );
+
+    my $artist = $cdinfo->{album}->{performer};
+    $artist =~ s/"//g;
+    my $albumtitle = $cdinfo->{album}->{albumname};
+    $albumtitle =~ s/"//g;
+    my $cmd = "$bin_getcoverart \"$artist\" \"$albumtitle\" $catemp >/tmp/xx1 2>&1";
+    &dumpstatus('busy', "finding cover art for \"$artist - $albumtitle\"");
+    system($cmd);
+
+    open(W, ">>$catemp");
+    close(W);
+
+    return ($catemp, $coverartfile);
+}
 
 sub performer_id {
     my $perf = shift;
@@ -510,10 +537,6 @@ sub get_audiocd_info {
             next;
         }
         if (ref($album) eq 'HASH') {
-            my $pvtemp = Thundaural::Util::mymktempname($sx->{storagedir}, $sx->{cddevice}, 'discinfo.pv');
-            open(X, ">$pvtemp");
-            print X Dumper($album)."\n";
-            close(X);
             &dumpstatus('busy', "$modulex succeeded");
             sleep 1;
             return $album;
