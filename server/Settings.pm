@@ -1,6 +1,12 @@
 
 package Settings;
 
+use strict;
+
+eval "use TAProgramLocations;";
+die("please run the checkdeps script to generate the TAProgramLocations.pm file\n")
+	if ($@);
+
 my $_storagedir = '/home/storage';
 
 my $_dbfile = "$_storagedir/db/data.db";
@@ -25,22 +31,30 @@ my $_devices = {
 		'read'=>'/dev/cdrom',
 		},
 	'oggremote'=>{
-		'command'=>'/usr/bin/ogg123 -d oss -o dsp:${DEVICEFILE} -R -',
-		},
-	'mp3remote'=>{
-		'command'=>'/usr/bin/mpg123 -o oss -a ${DEVICEFILE} -R -',
+		'command'=>TAProgramLocations::ogg123().' -d oss -o dsp:${DEVICEFILE} -R -',
 		},
 	'ripcdrom'=>{
-		'command'=>'./ripdisc.pl --sqlitedb ${DBFILE} --device ${DEVICEFILE}',
+		'command'=>'./ripdisc.pl --dbfile ${DBFILE} --device ${DEVICEFILE} --storagedir ${STORAGEDIR}',
 		},
 	'volumeset'=>{
-		'command'=>'/bin/aumix-minimal -d ${DEVICEFILE} -v${VOLUME}',
+		# always keep pcm at 100
+		'command'=>TAProgramLocations::aumix().' -d ${DEVICEFILE} -w 100 -v${VOLUME}',
 		},
 	'volumequery'=>{
-		'command'=>'/bin/aumix-minimal -d ${DEVICEFILE} -q',
+		'command'=>TAProgramLocations::aumix().' -d ${DEVICEFILE} -q',
 		},
 		
 };
+
+# no offical support for MP3 yet
+# {
+#	my $x1 = eval { return TAProgramLocations::mpg123(); };
+#	my $x2 = eval { return TAProgramLocations::mpg321(); };
+#	my $x = $x1 ? $x1 : $x2;
+#	if ($x) {
+#		$_devices->{'mp3remote'} = { 'command'=>$x.' -o oss -a ${DEVICEFILE} -R -' };
+#	}
+#}
 
 sub storagedir {
 	return $_storagedir;

@@ -5,6 +5,8 @@ package Page::Tracks;
 use strict;
 use warnings;
 
+use Carp;
+
 use Logger;
 
 use SDL;
@@ -57,13 +59,16 @@ sub new {
 
 	# passed in options
 	$this->{-server} = $o{-server};
-	die if (ref($this->{-server}) ne 'ClientCommands');
+	croak("-server option is not of class ClientCommands")
+		if (ref($this->{-server}) ne 'ClientCommands');
 
 	$this->{-canvas} = $o{-canvas};
-	die("canvas is not an SDL::Surface") if (!ref($this->{-canvas}) && !$this->{-canvas}->isa('SDL::Surface'));
+	croak("-canvas opton is not of class SDL::Surface")
+		if (!ref($this->{-canvas}) && !$this->{-canvas}->isa('SDL::Surface'));
 
 	$this->{-albums} = $o{-albums};
-	die("passed argument for -albums not an Album object") if (!ref($this->{-albums}) && !$this->{-albums}->isa('Albums'));
+	croak("-albums option is not of class Albums")
+		if (!ref($this->{-albums}) && !$this->{-albums}->isa('Albums'));
 
 	$this->{-imgsurfaces}->{arrow_down_white} = new SDL::Surface(-name=>'./images/arrow-down-white.png');
 	$this->{-imgsurfaces}->{arrow_down_red} = new SDL::Surface(-name=>'./images/arrow-down-red.png');
@@ -217,9 +222,10 @@ sub scroll_tracks {
 		$tracklist->scrollbypage($dir);
 		$this->queue_widget_frame('00-down', 0);
 	}
+	# comment out the next two lines for continuous scroll
 	$upbutton->hide($tracklist->at_top());
-	$upbutton->draw();
 	$downbutton->hide($tracklist->at_bottom());
+	$upbutton->draw();
 	$downbutton->draw();
 }
 
@@ -232,7 +238,7 @@ sub now_viewing {
 	$this->{-albumid} = $albumid;
 	
 	Logger::logger("getting tracks for $albumid");
-	my $al = new Album(-albumid=>$albumid);
+	my $al = new Album(-albumid=>$albumid, -albums=>$this->{-albums});
 
 	$this->widget('00-tracklist')->reset();
 	$this->widget('00-albumcover')->surface(0, $this->_make_album_cover($albumid));
@@ -288,7 +294,8 @@ sub now_viewing {
 	$line = 0;
 	my $maxwidth = $this->widget('00-tracklist')->width();
 
-	$trlcon->fill(new SDL::Rect(-width=>1004,-height=>2,-x=>0,-y=>$line*$basesize), new SDL::Color(-r=>190, -g=>190, -b=>190));
+	my $dividinglinecolor = new SDL::Color(-r=>90, -g=>90, -b=>90);
+	$trlcon->fill(new SDL::Rect(-width=>1004,-height=>2,-x=>0,-y=>$line*$basesize), $dividinglinecolor);
 	foreach my $t (@$tracks) {
 		eval {
 			my $string = sprintf("%d. %s", $line+1, $t->name());
@@ -305,24 +312,43 @@ sub now_viewing {
 			if ($t->performer() ne $al->performer()) {
 				push(@data, $t->performer());
 			}
-			push(@data, sprintf("%s of %s", $this->sectotime($t->length(), my $short=1), $t->genre()));
+			#push(@data, sprintf("%s of %s", $this->sectotime($t->length(), my $short=1), $t->genre()));
+			push(@data, $this->sectotime($t->length(), my $short=1));
 			my $rt = $t->rank();
 			$rt = $this->english_rank($rt);
 			push(@data, "ranked $rt") if ($rt);
 			my $pop = $t->popularity();
-			push(@data, ($pop+0) ? sprintf('popularity %.4f', $pop*1000) : 'never played');
+			push(@data, ($pop+0) ? sprintf('popularity %.7f', $pop) : 'never played');
 			my $d = join(', ', @data);
 			$tinfofont->print($trlcon, 50, ($line*$basesize)+$trackfont->height, $d);
 		};
 		$line++;
 		# draw dividing line
-		$trlcon->fill(new SDL::Rect(-width=>1004,-height=>2,-x=>0,-y=>$line*$basesize), new SDL::Color(-r=>190, -g=>190, -b=>190));
+		$trlcon->fill(new SDL::Rect(-width=>1004,-height=>2,-x=>0,-y=>$line*$basesize), $dividinglinecolor);
 	}
+
+	# uncomment the following lines for continuous scroll
+	#	my $xs = new SDL::Surface(-width=>$trlcon->width(), -height=>$trlcon->height() * 2);
+	#	$xs->display_format();
+	#	$xs->fill(0, $transparent);
+	#	$xs->set_color_key(SDL::SDL_SRCCOLORKEY, $transparent);
+	#	my $xs1 = new SDL::Rect(-width=>$xs->width(), -height=>$xs->height(), -x=>0, -y=>0);
+	#	$trlcon->blit(0, $xs, $xs1);
+	#	$xs1->y($trlcon->height());
+	#	$trlcon->blit(0, $xs, $xs1);
+	#	# blit (srect, dest, drect);
+	#	$this->widget('00-tracklist')->content($xs);
+
+	# comment out the following line for continuous scroll
 	$this->widget('00-tracklist')->content($trlcon);
 	$this->widget('00-tracklist')->scrolluntil($trlcon->height());
 	$this->widget('00-up')->frame(0);
 	$this->widget('00-down')->frame(0);
-	$this->widget('00-up')->hide(1); # setting the content resets the offset to the top, so hide the up button
+
+	# setting the content resets the offset to the top, so hide the up button
+	# comment out the next line for continuous scroll
+	$this->widget('00-up')->hide(1); 
+
 	if ($trlsize <= $this->widget('00-tracklist')->height() ) {
 		# don't show the scroll buttons if the content is smaller than the canvas
 		$this->widget('00-down')->hide(1);

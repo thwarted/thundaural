@@ -1,7 +1,9 @@
 #!/usr/bin/php
-<?
+<?php
 
-# $Header: /home/cvs/thundaural/server/getcoverart.php,v 1.2 2003/12/27 10:25:42 jukebox Exp $
+# getcoverart.php - get cover art for albums using Amazon's SOAP API.
+
+# $Header: /home/cvs/thundaural/server/getcoverart.php,v 1.5 2004/03/26 08:12:41 jukebox Exp $
 
 includepath_add("/usr/local/lib/php");
 
@@ -10,20 +12,28 @@ $argc = $_SERVER['argc'];
 
 $stderr = fopen("php://stderr", "w");
 
-# getcoverart.php - get cover art for albums using Amazon's SOAP API.
-
 	$me = array_shift($argv);
+
+	if (ini_get('safe_mode')) {
+		fwrite($stderr, "$me can not run in safe-mode\n");
+		exit(1);
+	}
+
+	if (!ini_get('allow_url_fopen')) {
+		fwrite($stderr, "$me needs access to fopen URLs\n");
+		exit(1);
+	}
 
 	if ($argc != 4) {
 		fwrite($stderr, "Usage:\n$me <artist> <album> <outputfile>\n");
-		exit;
+		exit(1);
 	}
 
 	$artist = array_shift($argv);
 	$album = array_shift($argv);
 	$outputfile = array_shift($argv);
 
-	set_time_limit(0); # Run forever
+	set_time_limit(40); # lets hope this doesn't take more than 40 seconds
 
 	require("AmazonSearch.php"); # Load Amazon Search object
 
@@ -80,12 +90,14 @@ $stderr = fopen("php://stderr", "w");
 # bah, file() isn't binary safe in this version of PHP
 # and file_get_contents isn't available yet
 function get_image_file($url) {
-	$fp = fopen($url, "r");
 	$content = '';
-	while(!feof($fp)) {
-		$content .= fread($fp, 4096);
+	$fp = fopen($url, "r");
+	if ($fp) {
+		while(!feof($fp)) {
+			$content .= fread($fp, 4096);
+		}
+		fclose($fp);
 	}
-	fclose($fp);
 	return $content;
 }
 

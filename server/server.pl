@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-# $Header: /home/cvs/thundaural/server/server.pl,v 1.11 2004/01/30 09:43:25 jukebox Exp $
+# $Header: /home/cvs/thundaural/server/server.pl,v 1.17 2004/03/21 05:59:23 jukebox Exp $
 
 use strict;
 use warnings;
@@ -30,8 +30,11 @@ use Periodic;
 
 use DatabaseSetup;
 
+use POSIX qw/setsid/;
+
 use DBI;
 
+my $daemonize = 1;
 my $port = Settings::listenport();
 my $dbfile = Settings::dbfile();
 while (@ARGV) {
@@ -44,6 +47,20 @@ while (@ARGV) {
 		$dbfile = shift @ARGV;
 		next;
 	}
+	if ($a =~ m/^--?dontfork/) {
+		$daemonize = 0;
+		next;
+	}
+}
+
+if ($daemonize) {
+	open STDIN, '</dev/null' or die("can't read /dev/null: $!\n");
+	open STDOUT, '>>/dev/null' or die("can't write to /dev/null: $!\n");
+	open STDERR, '>>/dev/null' or die("can't write to /dev/null: $!\n");
+	defined(my $pid = fork) or die("can't fork: $!\n");
+	exit if ($pid);
+	setsid or die("can't set new session: $!\n");
+	umask 0;
 }
 
 DatabaseSetup::init($dbfile);
@@ -52,21 +69,6 @@ my $listener = new IO::Socket::INET(Listen => 5, LocalPort => $port, Proto => 't
 die if ($@);
 
 our $run : shared = 1;
-
-my $dbh = DBI->connect("dbi:SQLite:dbname=$dbfile","",""); # for this thread
-die if (!$dbh);
-# reset the playhistory, in case we were abort before
-{
-	my $q = "update playhistory set action = ? where action = ?";
-	my $sth = $dbh->prepare($q);
-	my $rv = $sth->execute('queued', 'playing');
-	$sth->finish;
-	if ($rv) {
-		$rv += 0;
-		Logger::logger("reset $rv queued songs");
-	}
-}
-$dbh->disconnect();
 
 my $storagedir = Settings::storagedir();
 my $dblock : shared = 0xfef1f0fa;
@@ -79,7 +81,7 @@ my $periodicthr;
 				-ref_dblock=>\$dblock,
 				-ref_state=>\$pstate,
 			);
-	$periodicthr = threads->new(sub { eval { $periodic->run(); }; Logger::logger("periodic tasks thread no longer running: $@"); } );
+	$periodicthr = threads->new(sub { eval { $periodic->run(); }; Logger::logger("periodic tasks thread no longer running $@"); } );
 }
 
 my $playerthrs = {};
@@ -99,6 +101,7 @@ my $readerthrs = {};
 	}
 }
 sleep 3; # give everything a chance to initialize
+#$0 = "thundaural-jukebox-server";
 my $serverthr = threads->new(\&server);
 $serverthr->join;
 undef $serverthr;
@@ -119,7 +122,7 @@ sub spawn_player_thread {
 			);
 	# we set this to one here to avoid a race condition, whereby the thread hasn't started yet, and we still read -running as 0
 	my $running : shared = 1;
-	my $playerthr = threads->new(sub { $running = 1; eval { $player->run(); }; Logger::logger("player thread for $device no longer running: $@"); $running = 0; });
+	my $playerthr = threads->new(sub { $running = 1; eval { $player->run(); }; Logger::logger("player thread for $device no longer running $@"); $running = 0; });
 	my $ret = {-thread=>$playerthr, -object=>$player, -running=>\$running};
 	return $ret;
 }
@@ -136,7 +139,7 @@ sub spawn_reader_thread {
 			);
 	# we set this to one here to avoid a race condition, whereby the thread hasn't started yet, and we still read -running as 0
 	my $running : shared = 1; 
-	my $readerthr = threads->new(sub { $running = 1; eval { $reader->run(); }; Logger::logger("reader thread for $device no longer running: $@"); $running = 0; });
+	my $readerthr = threads->new(sub { $running = 1; eval { $reader->run(); }; Logger::logger("reader thread for $device no longer running $@"); $running = 0; });
 	my $ret = {-thread=>$readerthr, -object=>$reader, -running=>\$running};
 	return $ret;
 }
@@ -158,8 +161,11 @@ sub server {
 	my $lastname = '';
 	my $lastcount = 0;
 
+	$connections->{server} = {peername=>'jukebox', name=>'jukebox', connectedat=>time()};
+
 	READLOOP:
-	while(my ($rs, $ws, $es) = IO::Select->select($selreaders, $selwriters, undef)) {
+	while(1) {
+		my ($rs, $ws, $es) = IO::Select->select($selreaders, $selwriters, undef, 0.5);
 		foreach my $fh (@$ws) {
 			my $line = shift @{$pendingwrites->{$fh}};
 			print $fh $line if ($line);
@@ -173,7 +179,7 @@ sub server {
 				my $peer = $newsock->peerhost().":".$newsock->peerport();
 				Logger::logger("connection from $peer");
 				$selreaders->add($newsock);
-				$connections->{$newsock} = {peername=>$peer, name=>$peer};
+				$connections->{$newsock} = {peername=>$peer, name=>$peer, connectedat=>time()};
 			} else {
 				my $input = <$fh>;
 				my $discon = 0;
@@ -182,7 +188,12 @@ sub server {
 					$input = ('noop '.time()) if ($input =~ m/^$/);
 
 					# unfortuantely, some commands can't be implemented in ServerCommands.pm
-					last READLOOP if ($input =~ m/^shut/);
+					if ($input =~ m/^shut/) {
+						Logger::logger('shutdown requested by %s (%s)', 
+							$connections->{$fh}->{name},
+							$connections->{$fh}->{peername});
+						last READLOOP;
+					}
 
 					# the following if was added to test player/reader thread restarting upon death
 					# it will eventually be removed
@@ -190,7 +201,8 @@ sub server {
 						my $dv = $1;
 						if (exists($playerthrs->{$dv})) {
 							$playerthrs->{$dv}->{-object}->cmdqueue()->enqueue('abort');
-							$playerthrs->{$dv}->{-object}->cmdqueue()->enqueue(undef); # get the player thread to exit
+							# get the player thread to exit
+							$playerthrs->{$dv}->{-object}->cmdqueue()->enqueue(undef); 
 							print $fh "200 told $dv to abort\n";
 						} else {
 							print $fh "300 unknown play device $dv\n";
@@ -285,6 +297,7 @@ sub server {
 		threads->yield();
 	}
 	foreach my $fh (keys %$connections) {
+		next if ($fh eq 'server');
 		Logger::logger("shutdown, closing ".$connections->{$fh}->{name});
 		close($fh);
 	}

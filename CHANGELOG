@@ -1,3 +1,84 @@
+changes from version 1.4 to version 1.5
+
+- completely new ripdisc.pl script that supports modular album
+  lookup methods.  First it will try MusicBrainz, and failing that
+  it will try FreeDB.  Additional modules can be added easily.
+  Now requires XML::Ximple perl module (for MusicBrainz).  The
+  new ripper does not support different agressiveness levels,
+  which were required when using cdparanoia.
+  cdda2wav is required for cdindexid and cddbid calculation.
+
+- checkdeps script generates a TAProgramLocations.pm perl module
+  that is used by the server.  After running checkdeps, be sure
+  to move this file into the server directory.
+
+- perfers dagrab over cdda2wav over cdparanoia for audio extraction
+  Get dagrab from http://vertigo.fme.vutbr.cz/~stibor/dagrab.html
+  Since we require cdda2wav elsewhere, we'll never actually try to
+  use cdparaonia -- I know this, and maybe I'll get around to fixing
+  it.  Or maybe not, I'm not too happy with the output of cdparanoia
+
+- don't try to backup an empty database
+
+- don't make it look like we support playing MP3s when we don't.
+  had references to it in code that did execute, but I never
+  tested it.
+
+- added checksum command to server (clients should be better able
+  to manage/reduce bandwidth with intelligent use)
+
+- "coverart ripping" returns the cover art image for the current 
+  ripping process
+
+- client now takes --host and --port options to designate the
+  server to connect to
+
+- database gets upgraded to version 3:
+    albums.source to store source of album information
+    albums.cdindexid column to store musicbrainz CDindex
+    albums can have more than one image
+    performers abstracted to another table
+    support for individual track attributes (for future expansion)
+
+- rank numbering fixed.  If the top two tracks have the same
+  popularity, they'll both be ranked first.  The next possible
+  ranking is third (because there are two tracks before it), and there
+  is no track ranked second
+
+- new server command 'version', which reports the client/server
+  protocol version number (currently at 4)
+
+- client verifies it's talking to a compatible server before continuing
+
+- removed printing of the genres in the client, since protocol v4
+  doesn't support them (they were moved to the trackattributes table)
+
+- verified that ripping speed is correct (vorbis encoding seems to be
+  the limiter (can't get faster than ~5x on my test machine, but dagrab
+  will rip to a file at around 12x.  Rip to a file and then encode to
+  vorbis takes roughly the same amount of time as doing it in a 
+  pipeline))
+
+- trying out a new background image from the excellent legacy Propaganda 
+  collection (ich bin ein good looking desktop whore) to hold me over
+  until the interface gets ravamped.  To revert the old brushed-metal-like 
+  one, change the lines that are commented out in the load_images function 
+  in client/interface.pl
+
+- included startup script for the server in the startup/ directory, and for 
+  the client in the client/ directory.  See startup/README.startup 
+  or the installation page on the website for instructions on use.
+
+- added --dontfork option to the server, which keeps it from daemonizing
+  itself (which it does by default now)
+
+- fixed bug that was keeping the albums page from being updated if there
+  were less than 6 albums in the database and new album was ripped
+
+- other cleanups of both minor and major natures
+
+
+
 changes from version 1.3 to version 1.4
 
 - renamed Statistics.pm to Periodic.pm, since it will now handle
@@ -163,4 +244,4 @@ changes from version 1.0 to version 1.1
   libs I'm using, or SDL::TTFont code such that memory gets leaked everytime 
   lots of text is drawn to a surface.
 
-$Header: /home/cvs/thundaural/CHANGELOG,v 1.6 2004/01/31 08:55:27 jukebox Exp $
+$Header: /home/cvs/thundaural/CHANGELOG,v 1.13 2004/03/27 19:09:50 jukebox Exp $

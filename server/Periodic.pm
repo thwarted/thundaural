@@ -2,7 +2,7 @@
 
 package Periodic;
 
-# $Header: /home/cvs/thundaural/server/Periodic.pm,v 1.3 2004/01/30 09:29:02 jukebox Exp $
+# $Header: /home/cvs/thundaural/server/Periodic.pm,v 1.5 2004/03/16 08:28:47 jukebox Exp $
 
 use strict;
 use warnings;
@@ -183,9 +183,9 @@ sub enqueue_random_song {
 
 	Logger::logger("random play, enqeueing track $trackid");
 
-	$q = "insert into playhistory (playhistoryid, trackid, devicename, requestedat, action) values (NULL, ?, ?, ?, ?)";
+	$q = "insert into playhistory (playhistoryid, trackid, devicename, requestedat, source, action) values (NULL, ?, ?, ?, ?, ?)";
 	$sth = $this->{-dbh}->prepare($q);
-	$sth->execute($trackid, $devicename, time(), 'queued');
+	$sth->execute($trackid, $devicename, time(), 'random', 'queued');
 	$sth->finish;
 }
 
@@ -235,14 +235,17 @@ sub _update_track_ranks {
 	$sth->execute();
 	my @ret = ();
 	my $rank = 0;
+	my $seensongs = 0;
 	eval {
 		$this->{-dbh}->begin_work();
+		$this->{-dbh}->do("update tracks set popularity = 0, rank = NULL");
 		my $lastpop = -1;
 		while(my($cnt, $pop, $trackid) = $sth->fetchrow_array()) {
-			$rank++ if ($pop != $lastpop);
+			$seensongs++;
+			$rank = $seensongs if ($pop != $lastpop);
+			$lastpop = $pop;
 			my $q = "update tracks set popularity = $pop, rank = $rank where trackid = $trackid";
 			$this->{-dbh}->do($q);
-			$lastpop = $pop;
 		}
 	};
 	if ($@) {

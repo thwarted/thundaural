@@ -1,0 +1,46 @@
+My production system starts up the server from initscripts and the client
+from inittab, with the client in a dedicated X session.  Setting it up a 
+machine as a dedicated jukebox is beyond the scope of this document, but 
+anyone with reasonable UNIX knowledge should be able to muddle through it.
+
+----------------------------------------------------------------------
+Starting up the server at boot:
+
+The script startup/thundauralserver should be placed in /etc/init.d,
+which can be enabled using chkconfig or ntsysv or whatever however your
+system invokes startup programs.  It takes the standard start and stop
+arguments.
+
+I specify it to start in runlevel 4 only, designating runlevel 4
+as "the jukebox" runlevel on my dedicated production system.
+
+----------------------------------------------------------------------
+Starting up the client at boot:
+
+To start up the client, execute the following command (giving the full path
+to the script (which is important) as root:
+
+    <installationdir>/client/start-x-for-jukebox <user>
+
+(note that this script might not be owned by root depending on how you
+extracted the files, which can be a security hole if your jukebox is 
+a shared login system)
+for my test system, in which I extracted the thundaural directory to:
+
+    /home/users/jukecl/Jukebox/thundaural
+
+I use the following command line, as the user I want to run the client
+as is jukecl:
+
+    /home/users/jukecl/Jukebox/thundaural/client/start-x-for-jukebox jukecl
+
+The <user> argument is the name of the user who the jukebox client should
+run as.  All start-x-for-jukebox does is invoke xinit with the xinitrc.sh
+script which is also in the client/ directory.
+
+To have the client start automaticly on boot, put that same line in
+/etc/inittab.  Here's what mine says:
+
+    i4:4:respawn:/home/users/jukecl/Jukebox/thundaural/client/start-x-for-jukebox jukecl
+
+# $Header: /home/cvs/thundaural/startup/README.startup,v 1.2 2004/03/21 05:00:25 jukebox Exp $

@@ -1,11 +1,12 @@
 #!/usr/bin/perl
 
-# $Header: /home/cvs/thundaural/client/EventReceiver.pm,v 1.2 2003/12/27 10:46:53 jukebox Exp $
+# $Header: /home/cvs/thundaural/client/EventReceiver.pm,v 1.3 2004/03/27 08:27:58 jukebox Exp $
 
 package EventReceiver;
 
 use strict;
-#no strict 'subs';
+
+use Carp;
 
 use SDL;
 use SDL::Constants;
@@ -68,7 +69,8 @@ sub _collided {
 	};
 	warn($@) if ($@);
 	return if (!$mask);
-	die "mask value is not an SDL::Rect" if (ref($mask) ne 'SDL::Rect');
+	die("value returned by EventReceiver::mask is not of class SDL::Rect")
+		if (ref($mask) ne 'SDL::Rect');
 
 	my $left = $mask->x;
 	my $right = $left + $mask->width;

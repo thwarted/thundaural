@@ -1,14 +1,12 @@
 
 package Album;
 
-# $Header: /home/cvs/thundaural/client/Album.pm,v 1.3 2004/01/09 06:01:47 jukebox Exp $
+# $Header: /home/cvs/thundaural/client/Album.pm,v 1.4 2004/03/21 03:47:15 jukebox Exp $
 
 use strict;
 use Albums;
 use ClientCommands;
 use Track;
-
-my $iCon;
 
 sub new {
         my $class = shift;
@@ -18,7 +16,8 @@ sub new {
         bless $this, $class;
 
         $this->{-albumid} = $opts{-albumid};
-	$this->{iCon} = $main::iCon;
+	#$this->{iCon} = $main::iCon;
+	$this->{-albums} = $opts{-albums};
 	$this->_populate();
 
         return $this;
@@ -28,7 +27,7 @@ sub _populate {
         my $this = shift;
 
         return if (!$this->{-albumid});
-	my $x = $main::Albums->get($this->{-albumid});
+	my $x = $this->{-albums}->get($this->{-albumid});
 	$this->{-info} = $x;
 }
 
@@ -59,7 +58,7 @@ sub tracks {
 	my $this = shift;
 	$this->_populate() if (!$this->{-info});
 
-	my $trks = $this->{iCon}->getlist("tracks", $this->{-albumid});
+	my $trks = $this->{-albums}->server_connection()->getlist("tracks", $this->{-albumid});
 	if (ref($trks) eq 'ARRAY') {
 		my $ret = [];
 		foreach my $t (@$trks) {
@@ -73,7 +72,7 @@ sub tracks {
 sub trackids {
 	my $this = shift;
 
-	return $main::Albums->trackids($this->{-albumid});
+	return $this->{-albums}->trackids($this->{-albumid});
 }
 
 sub trackrefs {

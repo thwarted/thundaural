@@ -12,6 +12,8 @@ use SDL::Event;
 
 use Logger;
 
+my $PROTOCOL_VERSION = '4';
+
 sub new {
 	my $class = shift;
 	my %opts = @_;
@@ -45,6 +47,7 @@ sub new {
 
 sub _ensureconnect {
 	my $this = shift;
+
 	if (!$this->{ihn} || !$this->{ihn}->connected()) {
 		my $try = 0;
 		eval { $this->{ihn}->shutdown(2); };
@@ -79,9 +82,28 @@ sub _ensureconnect {
 				}
 			}
 			my $h = $this->{ihn};
+			my $x;
+
+			# wait for the server to respond
+			print $h "noop connectionsync-".time()."\n";
+			$x = <$h>;
+			next TRYCONNECT if (!defined($x));
+
+			# verify protocol version
+			print $h "version\n";
+			$x = <$h>;
+			next TRYCONNECT if (!defined($x));
+			($x) = $x =~ m/^200 version (.+)/;
+			die("unable to determine server's protocol version\n")
+				unless (defined($x));
+			die("client/server protocol version mismatch ".
+			    "(server reports $x, looking for $PROTOCOL_VERSION)\n") 
+				unless ($x eq $PROTOCOL_VERSION);
+
+			# set our client name -- do auth here in the future
 			my $me = `/bin/hostname`; chomp $me;
 			print $h "name $me($$,jbsdl)\n";
-			my $x = <$h>; # dump response line
+			$x = <$h>; # dump response line
 			last if defined($x);
 		}
 	}
@@ -90,13 +112,18 @@ sub _ensureconnect {
 
 sub _clearinput {
 	my $this = shift;
-	my $tail = time().".".int(rand(999));
+	my $tail = shift || '';
+	$tail .= '.' if ($tail);
+	$tail .= sprintf('%d.%d', time(), int(rand(999)));
 
 	my $h = $this->_ensureconnect();
         print $h "noop $tail\n";
 	my $i;
         do {
                 $i = <$h>;
+		if (!$i) {
+			die("error when connecting, disconnected half way through, aborting");
+		}
                 chomp $i;
         } while($i !~ m/^200 noop $tail/);
 }
@@ -433,7 +460,9 @@ sub coverart {
 
 	my $bytes = $this->_do_cmd("coverart $albumid");
 	if (!$bytes || $bytes =~ m/^\d{3}$/) {
-		return undef;
+		Logger::logger('no data received for cover art');
+		$bytes = '';
+		#return undef;
 	}
 
         open(F, ">$outputfile");
@@ -462,6 +491,11 @@ sub _do_cmd {
 		if ($rescode == 202) { # binary data
 			my($size) = $more =~ m/^(\d+) bytes/;
 			if (!$size) {
+				# verify that there is no data
+				$input = <$h>;
+				next RECONNECT if (!defined($input));
+				chomp $input;
+				next RECONNECT if ($input !~ m/^\.$/);
 				return '';
 			}
 			my $bytes = '';

@@ -2,9 +2,12 @@
 
 package ProgressBar;
 
-# $Header: /home/cvs/thundaural/client/ProgressBar.pm,v 1.4 2004/01/30 05:35:02 jukebox Exp $
+# $Header: /home/cvs/thundaural/client/ProgressBar.pm,v 1.5 2004/03/27 08:27:58 jukebox Exp $
 
 use strict;
+
+use Carp;
+
 use SDL;
 use SDL::Color;
 use SDL::App;
@@ -78,7 +81,8 @@ sub mask {
 	my $this = shift;
 	my $rect = shift;
 	if (defined($rect)) {
-		die "not SDL::Rect" if (ref($rect) ne 'SDL::Rect');
+		croak("ProgressBar::mask argument is not SDL::Rect")
+			if (ref($rect) ne 'SDL::Rect');
 		$this->{-mask} = $rect;
 	}
 	$this->{-mask};

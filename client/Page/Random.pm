@@ -1,11 +1,13 @@
 #!/usr/bin/perl
 
-# $Header: /home/cvs/thundaural/client/Page/Random.pm,v 1.2 2004/01/30 05:34:12 jukebox Exp $
+# $Header: /home/cvs/thundaural/client/Page/Random.pm,v 1.3 2004/03/27 08:19:01 jukebox Exp $
 
 package Page::Random;
 
 use strict;
 use warnings;
+
+use Carp;
 
 use Logger;
 
@@ -62,10 +64,12 @@ sub new {
 
 	# passed in options
 	$this->{-server} = $o{-server};
-	die if (ref($this->{-server}) ne 'ClientCommands');
+	croak("-server option is not of class ClientCommands")
+		if (ref($this->{-server}) ne 'ClientCommands');
 
 	$this->{-canvas} = $o{-canvas};
-	die("canvas is not an SDL::Surface") if (!ref($this->{-canvas}) && !$this->{-canvas}->isa('SDL::Surface'));
+	croak("-canvas option is not of class SDL::Surface")
+		if (!ref($this->{-canvas}) && !$this->{-canvas}->isa('SDL::Surface'));
 
 	$this->{-storagedir} = '/home/storage';
 

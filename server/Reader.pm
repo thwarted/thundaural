@@ -2,7 +2,7 @@
 
 package Reader;
 
-# $Header: /home/cvs/thundaural/server/Reader.pm,v 1.3 2004/01/09 07:07:00 jukebox Exp $
+# $Header: /home/cvs/thundaural/server/Reader.pm,v 1.4 2004/03/16 08:25:14 jukebox Exp $
 
 use strict;
 use warnings;
@@ -126,6 +126,7 @@ sub run {
 			foreach my $y (@ppargs) {
 				$y =~ s/\${DEVICEFILE}/$devicefile/g;
 				$y =~ s/\${DBFILE}/$dbfile/g;
+				$y =~ s/\${STORAGEDIR}/$storagedir/g;
 				push(@x, $y);
 			}
 			@ppargs = @x;

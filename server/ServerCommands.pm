@@ -9,16 +9,21 @@ use threads;
 use threads::shared;
 
 use DBI;
+#use Safe;
 
 use Settings;
 use Logger;
 
+my $PROTOCOL_VERSION = '4';
+
 my $BIN_DF = '/bin/df';
 
-# $Header: /home/cvs/thundaural/server/ServerCommands.pm,v 1.13 2004/01/30 10:23:33 jukebox Exp $
+# $Header: /home/cvs/thundaural/server/ServerCommands.pm,v 1.17 2004/03/19 05:03:42 jukebox Exp $
 
-my @cmds = sort qw/pause skip tracks queued devices play albums quit help 
-		noop volume status who name rip abort stats randomize coverart/;
+my @cmds = sort qw/pause skip tracks queued devices play albums quit help edit version
+		noop volume status who name rip abort stats randomize coverart checksum/;
+
+my $in_checksum = 0;
 
 sub new {
 	my $class = shift;
@@ -106,19 +111,99 @@ sub cmd_who {
 	}
 
 	my @r = ();
-	my $f = "\%s\t\%s\t\%d\t\%d\n";
+	my $f = "\%s\t\%s\t\%d\t\%d\t\%d\n";
 	my $x = $f;
 	$x =~ s/\%d/\%s/g;
 	foreach my $c (keys %$connections) {
+		next if ($c eq 'server');
+		#print "$c = ".$connections->{$c}->{connectedat}."\n";
 		push(@r, sprintf $f, $connections->{$c}->{peername},
-			($connections->{$c}->{name} || ''),
-			($connections->{$c}->{inputs} || 0),
-			($connections->{$c}->{outputs} || 0));
+				    ($connections->{$c}->{name} || ''),
+				    ($connections->{$c}->{inputs} || 0),
+				    ($connections->{$c}->{outputs} || 0),
+				    ((time() - $connections->{$c}->{connectedat}) || 0)
+		);
 	}
-	return $this->_format_list(201, 'client name inputs outputs', [@r]);
+	return $this->_format_list(201, 'client name inputs outputs connecttime', [@r]);
+}
+
+sub cmd_checksum {
+	my $this = shift;
+	my $input = shift;
+	my $fh = shift;
+	my $connections = shift;
+
+	if ($in_checksum) {
+		return (400, "400 nested checksum call\n");
+	}
+	
+	if ($input =~ m/^help/) {
+		return (200, "200 checksum <md5|sha1> <cmd> - returns a checksum for the list or binary output of <cmd>\n");
+	}
+
+	my($type, $cmd) = $input =~ m/^\s*(\w+)\s+(.+)$/;
+	my $csp;
+	if ($type eq 'md5') {
+		$csp = '/usr/bin/md5sum';
+	} elsif ($type eq 'sha1') {
+		$csp = '/usr/bin/sha1sum';
+	} else {
+		return (400, "400 unknown checksum type \"$type\"\n");
+	}
+	if (! -x $csp) {
+		return (500, "500 unable to find checksumming program for $type\n");
+	}
+	$in_checksum = 1;
+	my @cmdres = $this->process($cmd, $fh, $connections);
+	$in_checksum = 0;
+	my($rescode, $output) = @cmdres;
+	if ($rescode == 201 || $rescode == 202) {
+		if (ref($output) ne 'ARRAY') {
+			$output = [$output];
+		}
+		if ((scalar @$output) < 2) {
+			return (500, "500 internal error, result has less than three entries.\n");
+		}
+		my $resline = shift @$output;
+		my $tailline = pop @$output;
+
+		# there may be a race condition with using this temporary file
+		# if there is, you'll have to be the user that is running
+		# this code or root to exploit it if /tmp is sticky
+		# if /tmp isn't sticky, all bets are off anyway
+		my $tmpfile = sprintf("/tmp/ths.chksum.out.%d.%d", $$, rand(99999));
+		my $oldumask = umask 0022;
+		if (open(CS, ">$tmpfile")) {
+			close(CS);
+		} else {
+			return (500, "500 internal error, unable to create temp file for checksumming.\n");
+		}
+		umask $oldumask;
+		if (! -f $tmpfile || -s $tmpfile) {
+			return (500, "500 internal error, temporary file is not a file or is not empty.\n");
+		}
+		if (open(CS, "| $csp - > $tmpfile")) {
+			foreach my $l (@$output) {
+				print CS $l;
+			}
+			close(CS);
+			open(CS, "<$tmpfile");
+			my $line = <CS>;
+			close(CS);
+			unlink($tmpfile);
+			my($csum, $file) = split(/\s+/, $line);
+			return $this->_format_list(201, 'checksum type command', ["$csum\t$type\t$cmd\n"]);
+		} else {
+			return (500, "500 unable to calculate checksum\n");
+		}
+	} else {
+		return ($rescode, $output);
+		#return (400, "400 output is not list or binary\n");
+	}
 }
 
 sub cmd_coverart {
+	# returns the first it finds, doesn't honor multiple devices that may be ripping
 	my $this = shift;
 	my $input = shift;
 	
@@ -128,24 +213,40 @@ sub cmd_coverart {
 
 	my @x = split(/\s+/, $input);
 	my $albumid = shift @x;
-	return (400, "400 must specify an albumid\n") if (!$albumid);
-
 	my($ai, $caf);
-	eval {
-		lock(${$this->{-dblock}});
-		my $q = 'select albumid, coverartfile from albums where albumid = ?';
-		my $sth = $this->{-dbh}->prepare($q);
-		$sth->execute($albumid);
-		($ai, $caf) = $sth->fetchrow_array();
-		$sth->finish();
-	};
 
-	return (400, "400 album $albumid does not exist\n") if (!$ai);
+	if ($albumid eq 'ripping') {
+		my $sd = Settings::storagedir();
+		my @cas = ();
+		if (opendir(DIR, $sd)) {
+			@cas = grep { /coverart/ && -f "$sd/$_" } readdir(DIR);
+			closedir DIR;
+		}
+		if (!(scalar @cas)) {
+			return (400, "400 no cover art found for active ripping process\n");
+		}
+		$caf = shift @cas;
+		$caf = "$sd/$caf";
+	} else {
+		$albumid += 0;
+		return (400, "400 must specify an albumid\n") if (!$albumid);
 
-	return (400, "400 album $albumid does not have cover art\n") if (!$caf);
+		eval {
+			lock(${$this->{-dblock}});
+			my $q = 'select albumid, filename from albumimages where albumid = ? order by preference limit 1';
+			my $sth = $this->{-dbh}->prepare($q);
+			$sth->execute($albumid);
+			($ai, $caf) = $sth->fetchrow_array();
+			$sth->finish();
+		};
 
-	$caf = sprintf('%s/%s', Settings::storagedir(), $caf);
-	return (400, "400 cover art file is empty or non-existant\n") if (! -s $caf);
+		return (400, "400 album $albumid does not exist\n") if (!$ai);
+
+		return (400, "400 album $albumid does not have cover art\n") if (!$caf);
+
+		$caf = sprintf('%s/%s', Settings::storagedir(), $caf);
+		return (400, "400 cover art file is empty or non-existant\n") if (! -s $caf);
+	}
 
 	if (-x '/bin/file') {
 		# this is non-critical, but nice
@@ -164,12 +265,17 @@ sub cmd_coverart {
 		$fc .= $x;
 	}
 	close(F);
-	return (202, ["202 $size bytes follow, please cache\n", $fc, ".\n"]);
+	if ($fc) {
+		return (202, ["202 $size bytes follow, please cache\n", $fc, ".\n"]);
+	}
+	return (202, ["202 $size bytes follow, please cache\n", ".\n"]);
 }
 
 sub cmd_stats {
 	my $this = shift;
 	my $input = shift;
+	my $thisclient = shift;
+	my $connections = shift;
 
 	if ($input =~ m/^help/) {
 		return (200, "200 stats - show system statistics\n");
@@ -198,13 +304,13 @@ sub cmd_stats {
 		my $sth = $this->{-dbh}->prepare($q);
 		$sth->execute();
 		while (my($c, $a) = $sth->fetchrow_array()) {
-			$v{"tracks$a"} = int($c);
+			$v{"tracks-$a"} = int($c);
 		}
 		$sth->finish();
 	};
 	eval {
 		lock(${$this->{-dblock}});
-		my $q = "select count(1) from albums where coverartfile is not NULL";
+		my $q = "select count(1) from (select distinct albumid from albumimages)";
 		my $sth = $this->{-dbh}->prepare($q);
 		$sth->execute();
 		($v{coverartfiles}) = $sth->fetchrow_array();
@@ -215,8 +321,10 @@ sub cmd_stats {
 		my $line = <UPTIME>;
 		close(UPTIME);
 		my @x = split(/\s+/, $line);
-		$v{uptime} = int(shift @x);
+		$v{'uptime-machine'} = int(shift @x);
 	};
+	$v{'uptime-server'} = time() - int($connections->{server}->{connectedat});
+	$v{'uptime-client'} = time() - int($connections->{$thisclient}->{connectedat});
 	eval {
 		# it would be cool if we used statfs(2) here
 		my $sd = Settings::storagedir();
@@ -225,11 +333,11 @@ sub cmd_stats {
 		#/dev/hda8             32589620   7906656  23027468  26% /home
 		my $x = pop @x;
 		@x = split(/\s+/, $x);
-		$v{storagetotal} = int($x[1])*1024;
-		$v{storageused} = int($x[2])*1024;
-		$v{storageavailable} = int($x[3])*1024;
+		$v{'storage-total'} = int($x[1])*1024;
+		$v{'storage-used'} = int($x[2])*1024;
+		$v{'storage-available'} = int($x[3])*1024;
 		$x = $x[4]; $x =~ s/\D//g;
-		$v{storagepercentagefull} = int($x);
+		$v{'storage-percentagefull'} = int($x);
 	};
 
 	my @r = ();
@@ -347,7 +455,7 @@ sub cmd_status {
 	}
 
 	my @r = ();
-	my @keys = qw/devicename type state volume trackref performer name genre popularity rank length trackid started current percentage/;
+	my @keys = qw/devicename type state volume trackref performer name popularity rank length trackid started current percentage/;
 	my $outputs = Settings::get_of_type('play');
 
 	foreach my $o (@$outputs) {
@@ -372,7 +480,10 @@ sub cmd_status {
 		if ($x) {
 			($t, $a) = split(/\t/, $x);
 			lock(${$this->{-dblock}});
-			my $q = "select * from tracks t left join genres g on t.genreid = g.genreid where trackid = ? limit 1";
+			#my $q = "select * from tracks t left join genres g on t.genreid = g.genreid where trackid = ? limit 1";
+			my $q = "select *, p.name as performer, t.name as trackname 
+				from tracks t left join performers p on t.performerid = p.performerid 
+				where t.trackid = ? limit 1";
 			my $sth = $this->{-dbh}->prepare($q);
 			$sth->execute($t);
 			$r = $sth->fetchrow_hashref();
@@ -381,7 +492,8 @@ sub cmd_status {
 		} else {
 			($t, $a) = ('', '');
 			$tr = '';
-			$r = {performer=>'', name=>'', genre=>''};
+			#$r = {performer=>'', name=>'', genre=>''};
+			$r = {performer=>'', trackname=>''};
 		}
 		@v = (
 			$dev,
@@ -390,8 +502,8 @@ sub cmd_status {
 			$curvolsetting,
 			$tr,
 			$r->{performer},
-			$r->{name},
-			$r->{genre},
+			$r->{trackname},
+			#$r->{genre},
 			sprintf('%.7f', ($r->{popularity} || 0)),
 			($r->{rank} || 0),
 			$l,
@@ -620,7 +732,7 @@ sub cmd_track {
 	{
 		lock(${$this->{-dblock}});
 		my $q = "select * ".
-			"from tracks t left join genres g on t.genreid = g.genreid ".
+			"from tracks t ". #left join genres g on t.genreid = g.genreid ".
 			"where $where limit 1";
 		my $sth = $this->{-dbh}->prepare($q);
 		$sth->execute(@a);
@@ -628,13 +740,13 @@ sub cmd_track {
 		$sth->finish;
 	}
 	my $x = sprintf("%d/%d\t%s\t%s\t".
-			"%s\t%d\t%d\t".
+			"%d\t%d\t".
 			"%.7f\t%d\t%d\t%d\t%d\t%d\n", 
 			$a->{albumid}, $a->{albumorder}, $a->{performer}, $a->{name}, 
-			$a->{genre}, $a->{length}, $a->{trackid},
+			$a->{length}, $a->{trackid},
 			($a->{popularity} || 0), ($a->{rank} || 0), time(), time(), 1, 0);
 	push (@r, $x);
-	return $this->_format_list(201, "trackref performer name genre length trackid".
+	return $this->_format_list(201, "trackref performer name length trackid".
 			" popularity rank last-played last-queued times-played times-skipped", [@r]);
 }
 
@@ -653,23 +765,23 @@ sub cmd_tracks {
 	my @r = ();
 	{
 		lock(${$this->{-dblock}});
-		my $q = "select * ". # trackid, performer, name, length, albumorder, genre ".
-			"from tracks t left join genres g on t.genreid = g.genreid ".
-			"where albumid = ? order by albumorder";
+		my $q = "select t.*, p.name as performer".
+			" from tracks t left join performers p on p.performerid = t.performerid".
+			" where albumid = ? order by albumorder";
 		my $sth = $this->{-dbh}->prepare($q);
 		$sth->execute($albumid);
 		while(my $a = $sth->fetchrow_hashref()) {
 			my $x = sprintf("%d/%d\t".
-					"%s\t%s\t%s\t%d\t%d\t".
+					"%s\t%s\t%d\t%d\t".
 					"%.7f\t%d\t%d\n",
 					$albumid, $a->{albumorder}, 
-					$a->{performer}, $a->{name}, $a->{genre}, $a->{length}, $a->{trackid}, 
+					$a->{performer}, $a->{name}, $a->{length}, $a->{trackid}, 
 					($a->{popularity} || 0), ($a->{rank} || 0), ($a->{riperrors} || 0));
 			push(@r, $x);
 		}
 		$sth->finish;
 	}
-	return $this->_format_list(201, "trackref performer name genre length trackid popularity rank", [@r]);
+	return $this->_format_list(201, "trackref performer name length trackid popularity rank", [@r]);
 }
 
 sub cmd_queued {
@@ -689,9 +801,9 @@ sub cmd_queued {
 		}
 		@a = ($devicename);
 	}
-	my $q = "select * from playhistory ph 
+	my $q = "select *, t.name as trackname, p.name as performer from playhistory ph 
 	             left join tracks t on ph.trackid = t.trackid 
-		     left join genres g on g.genreid = t.genreid 
+		     left join performers p on t.performerid = p.performerid
 		  where ph.action = ?";
 	if ($devicename) {
 		$q .= " and devicename = ?";
@@ -703,14 +815,14 @@ sub cmd_queued {
 	my $total = 0;
 	my @r = ();
 	while (my $a = $sth->fetchrow_hashref()) {
-		my $x = sprintf("%s\t%d/%d\t%s\t%s\t%s\t%d\t%s\t%d\t%.7f\t%d\n", $a->{devicename}, $a->{albumid}, 
-				$a->{albumorder}, $a->{performer}, $a->{name}, $a->{genre}, $a->{length}, 
+		my $x = sprintf("%s\t%d/%d\t%s\t%s\t%d\t%s\t%d\t%.7f\t%d\n", $a->{devicename}, $a->{albumid}, 
+				$a->{albumorder}, $a->{performer}, $a->{trackname}, $a->{length}, 
 				$a->{trackid}, $a->{requestedat}, ($a->{popularity} || 0), ($a->{rank} || 0));
 		push(@r, $x);
 		$total++;
 	}
 	$sth->finish;
-	return $this->_format_list(201, "devicename trackref performer name genre length trackid requestedat popularity rank", [@r]);
+	return $this->_format_list(201, "devicename trackref performer name length trackid requestedat popularity rank", [@r]);
 }
 
 sub _is_valid_devicename_for_type($$) {
@@ -789,10 +901,10 @@ sub cmd_play {
 	}
 	$trackid += 0;
 	if ($trackid) {
-		my $q = "insert into playhistory (playhistoryid, trackid, devicename, requestedat, action) values (NULL, ?, ?, ?, ?)";
+		my $q = "insert into playhistory (playhistoryid, trackid, devicename, requestedat, action, source) values (NULL, ?, ?, ?, ?, ?)";
 		lock(${$this->{-dblock}});
 		my $sth = $this->{-dbh}->prepare($q);
-		$sth->execute($trackid, $devicename, time(), 'queued');
+		$sth->execute($trackid, $devicename, time(), 'queued', 'client');
 		$sth->finish;
 		return (200, "200 queued $trackid on $devicename\n");
 	} else {
@@ -819,8 +931,8 @@ sub cmd_albums {
 	my @albumids = split(/\s+/, $input);
 
 	lock(${$this->{-dblock}});
-	#my $q = "select albumid, performer, name, length, tracks, coverartfile from albums";
-	my $q = "select albumid, performer, name, length, tracks from albums";
+	my $q = "select a.albumid, p.name as performer, p.sortname as sortname, a.name, a.length, a.tracks 
+		from albums a left join performers p on a.performerid = p.performerid";
 	if (@albumids) {
 		my @x = ();
 		foreach my $y (@albumids) {
@@ -831,19 +943,16 @@ sub cmd_albums {
 		}
 		$q .= " where albumid in (".join(',', @x).")";
 	}
-	$q .= " order by performer, name";
+	$q .= " order by p.sortname, a.name";
 	my $sth = $this->{-dbh}->prepare($q);
 	$sth->execute;
 	my @r = ();
 	while(my $a = $sth->fetchrow_hashref()) {
-		#my $caf = '';
-		#if ($a->{coverartfile}) { $caf = $a->{coverartfile}; }
-		#my $x = sprintf "%d\t%s\t%s\t%d\t%d\t%s\n", $a->{albumid}, $a->{performer}, $a->{name}, $a->{length}, $a->{tracks}, $caf;
-		my $x = sprintf "%d\t%s\t%s\t%d\t%d\n", $a->{albumid}, $a->{performer}, $a->{name}, $a->{length}, $a->{tracks};
+		my $x = sprintf "%d\t%s\t%s\t%d\t%d\t%s\n", $a->{albumid}, $a->{performer}, $a->{name}, $a->{length}, $a->{tracks}, $a->{sortname};
 		push(@r, $x);
 	}
 	$sth->finish;
-	return $this->_format_list(201, "albumid performer name length tracks coverartfile", [@r]);
+	return $this->_format_list(201, "albumid performer name length tracks sortname", [@r]);
 }
 
 sub cmd_quit {
@@ -911,6 +1020,88 @@ sub cmd_time {
 		return (200, "200 time - display the server's idea of the current time\n");
 	}
 	return (200, "200 ".time()."\n");
+}
+
+sub cmd_version {
+	my $this = shift;
+	my $input = shift;
+
+	if ($input =~ m/^help/) {
+		return (200, "200 version - display protocol version\n");
+	}
+	return (200, "200 version $PROTOCOL_VERSION\n");
+}
+
+sub cmd_edit {
+	my $this = shift;
+	my $input = shift;
+
+	if ($input =~ m/^help/) {
+		return (200, "200 edit [track <trackref> | album <albumid>] set \"<attribute>\" to \"<value>\" - modify the database, setting <attribute> to <value> for the specified track or album\n");
+	}
+
+	my($what, $ref, $attr, $value) = $input =~ m/^(track|album)\s+(\d+|\d+\/\d+)\s+set\s+(\w+)\s+to\s+(.+)\s*$/;
+
+	return (400, "400 syntax error\n") if (!$what || !$ref || !$attr || !$value);
+	#return (400, "400 value must be enclosed in quotes\n") if ($value !~ m/^".*"$/);
+	#($value) = $value =~ m/^"(.*)"$/;
+	#if ($value =~ m/(?<!\\)"/) {
+	#	return (400, "400 unable to parse value\n");
+	#}
+	#$value =~ s/\\(.)/$1/g;
+
+	#my $compartment = new Safe;
+	#$compartment->permit(qw/scalar/);
+	#$value = $compartment->reval("$value;");
+
+	my @r = ();
+	push(@r, "what\t$what\n");
+	push(@r, "ref\t$ref\n");
+	push(@r, "attr\t$attr\n");
+	push(@r, "value\t$value\n");
+
+	my($table, $keyname, $key, @allowed);
+	if ($what eq 'track') {
+		if ($ref =~ m/\//) {
+			my($alid, $alor) = $ref =~ m/^(\d+)\/(\d+)$/;
+			my $q = "select trackid from tracks where albumid = ? and albumorder = ? limit 1";
+			my $sth = $this->{-dbh}->prepare($q);
+			$sth->execute($alid, $alor);
+			($key) = $sth->fetchrow_array();
+			$sth->finish;
+			return (400, "400 unable to find trackref $alid/$alor\n") if (!defined($key));
+		} else {
+			my $q = "select trackid from tracks where trackid = ? limit 1";
+			my $sth = $this->{-dbh}->prepare($q);
+			$sth->execute($ref);
+			($key) = $sth->fetchrow_array();
+			$sth->finish;
+			return (400, "400 unable to find trackid $ref\n") if (!defined($key));
+		}
+		$table = "tracks";
+		$keyname = "trackid";
+		@allowed = qw/performer name/;
+	} elsif ($what eq 'album') {
+		$table = "albums";
+		$keyname = "albumid";
+		$key = $ref + 0;
+		@allowed = qw/performer name/;
+	}
+
+	my $allowed_p = 0;
+	foreach my $x (@allowed) {
+		if ($x eq $attr) {
+			$allowed_p = 1;
+			last;
+		}
+	}
+	return (400, "400 $attr can not be set\n") if (!$allowed_p);
+
+	#my $r = "update $table set $attr = ? where $keyname = $key";
+	my $r = "update $table set $attr = ".$this->{-dbh}->quote($value)." where $keyname = $key";
+	push(@r, "$r\n");
+
+	return $this->_format_list(201, "var value", [@r]);
 }
 
 sub _format_list {

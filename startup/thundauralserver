@@ -1,0 +1,72 @@
+#!/bin/sh
+#
+# chkconfig: - 90 10
+# description: thundauralserver is the server component of the \
+#              thundaural jukebox system
+
+# $Header: /home/cvs/thundaural/startup/thundauralserver,v 1.7 2004/03/27 19:06:07 jukebox Exp $
+
+# Source function library.
+if [ -f /etc/init.d/functions ]; then
+    . /etc/init.d/functions
+elif [ -f /etc/rc.d/init.d/functions ]; then
+    . /etc/rc.d/init.d/functions
+else
+    echo "Could not find functions library"
+    exit 1   
+fi
+
+PATH=$PATH:/usr/local/bin
+export PATH
+
+JUKEDIR=/usr/local/thundaural/server
+JUKEUSER=jukesv
+
+
+JUKESERVER=$JUKEDIR/server.pl
+JUKESERVERCMD="/usr/bin/perl $JUKESERVER"
+JUKESHUTDOWN=$JUKEDIR/shutdown-server.pl
+JUKESHUTDOWNCMD="/usr/bin/perl $JUKESHUTDOWN"
+
+LOCKFILE=${INITLOCK:-/mnt/lockdev}/thundauralserver
+
+if [ ! -s $JUKESERVER ]; then
+  echo "Could not find jukebox server script"
+  failure "Could not find jukbox server script"
+  echo
+  exit 1
+fi
+
+if [ `/usr/bin/id -u` -ne 0 ]; then
+  echo "You must be root to run this script"
+  exit 1
+fi
+
+#  See how we were called.
+case "$1" in
+  start)
+	echo -n "Starting thundaural jukebox server:"
+	( cd $JUKEDIR ; exec /usr/bin/su $JUKEUSER -c "exec $JUKESERVERCMD" )
+	RETVAL=$?
+	[ $RETVAL -eq 0 ] && touch $LOCKFILE
+	echo_success
+	echo
+	;;
+  stop)
+	echo -n "Shutting down thundaural jukebox server:"
+	( cd $JUKEDIR ; exec /usr/bin/su $JUKEUSER -c "exec $JUKESHUTDOWNCMD" ) > /dev/null 2>&1
+	RETVAL=$?
+	if [ $RETVAL -eq 0 ]; then
+		rm -f $LOCKFILE
+		echo_success
+	else
+		echo_failure
+	fi
+	echo
+	;;
+  *)
+	echo "Usage: $0 {start|stop}"
+	exit 1
+esac
+
+exit $RETVAL

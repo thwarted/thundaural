@@ -5,6 +5,8 @@ package Page::Error;
 use strict;
 use warnings;
 
+use Carp;
+
 use Logger;
 
 use strict;
@@ -41,7 +43,8 @@ sub new {
 	bless ($this, $class);
 
 	$this->{-canvas} = $o{-canvas};
-	die("canvas is not an SDL::Surface") if (!ref($this->{-canvas}) && !$this->{-canvas}->isa('SDL::Surface'));
+	croak("-canvas option is not of class SDL::Surface")
+		if (!ref($this->{-canvas}) && !$this->{-canvas}->isa('SDL::Surface'));
 
 	$this->{-font} = new SDL::TTFont(
 				-name=>$errormsgfont,

@@ -1,9 +1,11 @@
 
 package Button;
 
-# $Header: /home/cvs/thundaural/client/Button.pm,v 1.3 2003/12/30 07:00:44 jukebox Exp $
+# $Header: /home/cvs/thundaural/client/Button.pm,v 1.4 2004/03/27 08:27:58 jukebox Exp $
 
 use strict;
+
+use Carp;
 
 use SDL;
 use SDL::Color;
@@ -93,6 +95,7 @@ sub surface_for_frame {
 	if (ref($x) eq 'SDL::Surface') {
 		return $x;
 	}
+	# perhaps this should be a fatal error?
 	Logger::logger("frame $frame for button $this isn't an SDL::Surface");
 	return undef;
 }
@@ -108,7 +111,8 @@ sub mask {
 	my $this = shift;
 	my $rect = shift;
 	if (defined($rect)) {
-		die "not SDL::Rect" if (ref($rect) ne 'SDL::Rect');
+		croak("Button::mask argument is not SDL::Rect")
+			if (ref($rect) ne 'SDL::Rect');
 		$this->{-mask} = $rect;
 	}
 	$this->{-mask};

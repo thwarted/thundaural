@@ -6,6 +6,18 @@ or on ICQ at 240033388.
 More dependancies are listed on the website.
 http://thwartedefforts.org/jukebox/
 
+You might want to install dagrab for ripping CDs.  I've had extremely good 
+experiences with it.  We'll fall back on cdda2wav and cdparanoia if you 
+don't have it.  You can get dagrab from:
+http://vertigo.fme.vutbr.cz/~stibor/dagrab.html
+
+***************************** IMPORTANT *********************************
+First thing you want to do is run the checkdeps script.  It will tell you
+if you are missing something.  It will generate a file named 
+TAProgramLocations.pm, which you should move into the server directory.
+Some of the stuff you need to do is covered below, so be sure to read
+this entire file.
+***************************** IMPORTANT *********************************
 
 Be sure you install ogg123 patched to include the --remote option.  Once
 you patch it for that, be sure to patch it with my patch to fix a problem
@@ -14,7 +26,11 @@ Thundaural download page.
 
 
 Review server/Settings.pm.  Hopefully the paths you need to make
-or change will be obvious.
+or change will be obvious.  Version 1.5, with the way the checkdeps
+script generates TAProgramLocations.pm, means there is less to check for
+required modifications in Settings.pm.  What you want to be sure of is
+that the device files for your sound output (/dev/dsp) and cdrom drive
+(/dev/cdrom) are correct.
 
 
 copy server/usr-local-lib-php/* to /usr/local/lib/php
@@ -22,26 +38,32 @@ these are just Amazon's webservices, you can put them somewhere else, if
 so then change server/getcoverart.php
 
 
-mkdir /home/storage, and of course it should be writable by the user who 
-will be running the server it should be readable by the user that runs 
-the client (so the client can read the coverart files)
+mkdir /home/storage, and of course it should be readable, writable and
+accessible by the user who will be running the server.
 
 
 mkdir /home/storage/db 
-this is where the SQLite database is stored, needs to be writable by the 
-server user
+this is where the SQLite database is stored, needs the same access
+permissions as /home/storage
 
 
 In version 1.4, the server was modified to create the necessary database
 structure if the datafile is empty.  All that is required is that the
 /home/storage/db directory be created and be acccessible.
+Version 1.5 saw some serious database changes, but the server is designed
+to upgrade the database schema to the latest version automaticly, without
+losing any data.
 
+The server/ripdisc.pl script uses cdda2wav and oggenc, you'll need to
+have those installed, along with XML::Ximple (for the MusicBrainz
+module) CDDB_get (for the FreeDB module). Both are available on CPAN).
 
 You can use the checkdeps script to see if everything is installed.  
 Please let me know if I missed anything.  If checkdeps doesn't report
 positive results for everything, then you most likely don't have
 something installed and will run into problems.
 
+------------------------------------------------------------------------
 
 start up the server
     cd ./server ; ./server.pl
@@ -53,25 +75,14 @@ Both the client and server take can take --stderr or --syslog to have
 the debugging information go to stderr or syslog.  --syslog is the
 default.
 
+See the file startup/README.startup for information on starting the 
+client and server automaticly on boot.
 
-My production system starts up the server and the client from inittab, 
-with the client in a dedicated X session.  Setting it up a machine as a 
-dedicated jukebox is beyond the scope of this document, but anyone with 
-reasonable UNIX knowledge should be able to muddle through it.  I can
-give you the scripts I'm using and details on how I have my system
-setup if need be.  More documentation on this will be forth coming,
-if anyone asks.
-
-
-The server/ripdisc.pl script uses cdparanoia and oggenc, you'll need to
-have those installed, along with CDDB_get (available on CPAN).
-
+------------------------------------------------------------------------
 
 That should be it.  You'll have to rip some CDs using the in-system CD 
 ripper before you can start playing anything (in the works is import
-functionality).  Admittedly, I have not tested it yet with a completely 
-empty database -- I have no idea what the client will do.  Please let 
-me know if you have any problems.
+functionality).
 
-$Header: /home/cvs/thundaural/INSTALL,v 1.4 2004/01/31 08:49:00 jukebox Exp $
+$Header: /home/cvs/thundaural/INSTALL,v 1.8 2004/03/27 09:45:23 jukebox Exp $
 
