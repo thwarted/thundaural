@@ -3,6 +3,7 @@
 BEGIN {
     if(my($dir) = $0 =~ m/^(.+)\/[^\/]+$/) {
         eval "use lib \"$dir/lib\"";
+        chdir $dir;
     }
 }
 
