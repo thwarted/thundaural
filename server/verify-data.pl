@@ -1,0 +1,131 @@
+#!/usr/bin/perl
+
+BEGIN {
+    my($dir) = $0 =~ m/^(.+)\/[^\/]+$/;
+    if ($dir) {
+        eval "use lib \"$dir\"";
+    }
+}
+
+use strict;
+use warnings;
+
+use Carp qw(cluck);
+use Data::Dumper;
+use Getopt::Long qw(:config pass_through);
+use File::Glob ':glob';
+use Storable qw(freeze thaw);
+
+$SIG{__WARN__} = sub { cluck(@_); };
+
+use Thundaural::Server::Settings;
+use Thundaural::Util;
+use DBI;
+
+my $fix_history = 0;
+GetOptions ("fix-history" => \$fix_history);
+
+my $dbh = DBI->connect("dbi:SQLite:dbname=".Thundaural::Server::Settings::dbfile(),'','',{RaiseError=>1, PrintError=>0, AutoCommit=>1})
+	or die(sprintf('unable to bind to database: %s%s', $DBI::errstr, "\n"));
+
+# get list of all audio files in the storage dir
+# get list of all cover art files
+
+my $storagedir = Thundaural::Server::Settings::storagedir();
+
+my $audiofiles = {};
+{
+    my @x = `cd $storagedir ; /usr/bin/find ? -type f`;
+    chomp @x;
+    foreach my $f (@x) {
+        $audiofiles->{$f} = [];
+    }
+}
+
+my $coverartfiles = {};
+{
+    my @x = `cd $storagedir ; /usr/bin/find coverart -type f`;
+    chomp @x;
+    foreach my $f (@x) {
+        $coverartfiles->{$f} = [];
+    }
+}
+
+{
+    my $q = "select trackid, filename from tracks";
+    my $sth = $dbh->prepare($q);
+    $sth->execute();
+    while(my($trackid, $f) = $sth->fetchrow_array()) {
+        if (!exists($audiofiles->{$f})) {
+            print "trackid $trackid references an audio file that doesn't exist ($f)\n";
+            next;
+        }
+        if (scalar @{$audiofiles->{$f}}) {
+            print "audiofile $f is referenced multiple times\n";
+        }
+        push(@{$audiofiles->{$f}}, $trackid);
+    }
+    $sth->finish();
+}
+
+{
+    foreach my $f (keys %{$audiofiles}) {
+        my @trackids = @{$audiofiles->{$f}};
+        my $c = scalar @trackids;
+        if ($c == 0) {
+            print "audio file $f is not referenced by a track\n";
+        } elsif ($c > 1) {
+            print "audio file $f is referenced by tracks ".join(', ', @trackids)."\n";
+        }
+    }
+}
+
+{
+    my $q = "select albumid, filename from albumimages";
+    my $sth = $dbh->prepare($q);
+    $sth->execute();
+    while(my($albumid, $filename) = $sth->fetchrow_array()) {
+        if (!exists($coverartfiles->{$filename})) {
+            print "albumid $albumid references non-existant cover art file ($filename)\n";
+            next;
+        }
+        if (scalar @{$coverartfiles->{$filename}}) {
+            print "cover art file $filename is referenced multiple times\n";
+        }
+        push(@{$coverartfiles->{$filename}}, $albumid);
+    }
+    $sth->finish();
+}
+
+{
+    foreach my $f (keys %{$coverartfiles}) {
+        my @albumids = @{$coverartfiles->{$f}};
+        my $c = scalar @albumids;
+        if ($c == 0) {
+            print "cover art file $f is not referenced by a track\n";
+        } elsif ($c > 1) {
+            print "cover art file $f is referenced by albums ".join(', ', @albumids)."\n";
+        }
+    }
+}
+
+{
+    my $q = "select distinct t.trackid, p.trackid from playhistory p left join tracks t on p.trackid = t.trackid where t.trackid is null order by 2";
+    my $sth = $dbh->prepare($q);
+    $sth->execute();
+    my @unrefedhistory = ();
+    while(my($x, $histtrack) = $sth->fetchrow_array()) {
+        push(@unrefedhistory, $histtrack);
+    }
+    $sth->finish();
+    if (my $c = scalar @unrefedhistory) {
+        print "$c non-existant tracks have history";
+        if ($fix_history) {
+            $dbh->do("delete from playhistory where trackid in (".join(',', @unrefedhistory).")");
+            print ", deleted\n";
+        } else {
+            print ", use --fix-history to delete them\n";
+        }
+    }
+}
+
