@@ -290,22 +290,24 @@ sub _mk_frame {
 
     croak("only a file or a surface may be passed") if ($file && $surf);
 
-    if ($file) {
-        $surf = new SDL::Surface(-name=>$file);
-        if ($surf->color_key() == -1 && $surf->alpha() == 255) {
-            # it's a GIF image, convert it
-            $surf->rgb();
+    eval {
+        if ($file) {
+            $surf = new SDL::Surface(-name=>$file);
+            if ($surf->color_key() == -1 && $surf->alpha() == 255) {
+                # it's a GIF image, convert it
+                $surf->rgb();
+            }
         }
-    }
-    if ($resize) {
-        my $area = $this->area();
-        #logger('resizing ratio is x%f y%f', $area->width() / $surf->width(), $area->height() / $surf->height());
-        $surf = SDL::Tool::Graphic::zoom(undef,
+        if ($resize) {
+            my $area = $this->area();
+            #logger('resizing ratio is x%f y%f', $area->width() / $surf->width(), $area->height() / $surf->height());
+            $surf = SDL::Tool::Graphic::zoom(undef,
                     $surf,
                     $area->width() / $surf->width(),
                     $area->height() / $surf->height(),
                     1);
-    }
+        }
+    };
 
     return $surf;
 }
