@@ -16,5 +16,5 @@ xscreensaver -nosplash &
 xsetroot -solid grey40
 xload -geometry 700x75-0-0 -update 3 &
 
-cd `dirname $0`
-/usr/bin/perl ./interface.pl > /dev/null 2>&1
+cd `dirname $0`/..
+/usr/bin/perl ./taclient-touchscreen > /dev/null 2>&1
