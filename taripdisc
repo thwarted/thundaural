@@ -136,12 +136,16 @@ if ($sx->{infofile} && !$sx->{cddevice}) {
         my $album = $cdinfo->{album}->{albumname};
         my $tracknum = $track->{tracknum};
         my $title = $track->{trackname};
+        my($extension) = $track->{filename} =~ m/\.(\w+)$/;
+        if (!$extension) {
+            $extension = 'ogg'; # most likely won't work anyway
+        }
         if ($cdinfo->{album}->{performer} =~ m/various artists/i) {
             $title = "$artist :: $title";
             $artist = "Various Artists";
         }
         $track->{sortdir} = &get_sort_dir($artist);
-        $track->{finalfilename} = sprintf("%s :: %s :: %02d :: %s.ogg", &unslash($artist), &unslash($album), $tracknum, &unslash($title));
+        $track->{finalfilename} = sprintf('%s :: %s :: %02d :: %s.%s', &unslash($artist), &unslash($album), $tracknum, &unslash($title), $extension);
     }
     my $failed = &add_album($cdinfo);
     if ($failed) {
