@@ -148,9 +148,10 @@ sub error_show_message {
     my $bgcolor = new SDL::Color(-r=>160, -g=>160, -b=>160);
     my $fgcolor = new SDL::Color(-r=>0, -g=>0, -b=>0);
     $app->fill(0, $bgcolor);
-    my $font = new SDL::TTFont(-name=>"./fonts/Vera.ttf", -size=>17, -bg=>$bgcolor, -fg=>$fgcolor);
+    my $font = new SDL::TTFont(-name=>"media/fonts/Vera.ttf", -size=>17, -bg=>$bgcolor, -fg=>$fgcolor);
 
-    my @lines = qw(hellofd asfd jfas dfd);
+
+    my @lines = ();
     if (scalar @_ == 1) {
         @lines = split(/\n/, shift);
     } else {
