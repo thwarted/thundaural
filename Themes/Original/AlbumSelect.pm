@@ -64,7 +64,7 @@ sub set_album {
             $this->{blank}->fill(0, $this->{bgcolor});
 
             my @text = ($album->performer(), ' ', $album->name(), sprintf('%d tracks', scalar @{$album->tracklist()}));
-            @text = $this->{font}->wrap($this->{blank}, @text);
+            @text = $this->{font}->wrap(rect=>$this->{blank}, lines=>\@text);
 
             my $textheight = $this->{font}->height() * (scalar @text);
             my $surfheight = $this->{blank}->height();
