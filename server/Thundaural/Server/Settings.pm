@@ -36,6 +36,10 @@ sub listenhost {
 	return $_vars->{listenhost};
 }
 
+sub audio_ripper_version {
+    return "Thundaural v1.8 Audio Ripper";
+}
+
 sub dbfile {
 	return $_vars->{dbfile};
 }
