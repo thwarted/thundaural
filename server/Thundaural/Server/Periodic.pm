@@ -13,6 +13,7 @@ use Thread::Queue;
 
 use File::Basename;
 use Data::Dumper;
+use File::Glob ':glob';
 
 $Data::Dumper::Indent = 0;
 $Data::Dumper::Sortkeys = 1;
@@ -21,6 +22,9 @@ use DBI;
 
 use Thundaural::Server::Settings;
 use Thundaural::Logger qw(logger);
+use Thundaural::Util;
+
+my $background_encoding : shared = 0;
 
 # runs periodic tasks, like updating stats
 
@@ -63,7 +67,7 @@ sub _dbconnect {
 	my $dbfile = $this->{-dbfile};
 	if ($dbfile) {
 		$this->{-dbh} = DBI->connect("dbi:SQLite:dbname=$dbfile","","");
-		logger("dbh is ".$this->{-dbh});
+		#logger("dbh is ".$this->{-dbh});
 	}
 }
 
@@ -90,8 +94,12 @@ sub run {
 	$this->_dbconnect();
 	my $storagedir = Thundaural::Server::Settings::storagedir();
 
-	my $statsupdatefreq = 60 * 3;
+    my $readersidlesince = time();
+    my $wavcheckfreq = 60;
+    my $lastwavchecktime = 0;
+    my $encodeidlewaittime = 60 * 5;
 
+	my $statsupdatefreq = 60 * 3;
 	my $laststatstime = time() - $statsupdatefreq;
 	my $laststatsphid = 0;
 	my $randomplayend = {};
@@ -157,10 +165,145 @@ sub run {
 			}
 		}
 
+        if (!$background_encoding) {
+            if (($lastwavchecktime + $wavcheckfreq) < time()) {
+                if (main::ripping_active()) {
+                    $readersidlesince = 0;
+                } else {
+                    if (!$readersidlesince) {
+                        $readersidlesince = time();
+                    }
+                    if ((time() - $readersidlesince) > $encodeidlewaittime) {
+                        if (!exists($main::activity{wavencoding})) {
+                            $background_encoding = 1;
+                            my $enthr = threads->new(sub { $this->encode_wav_to_ogg() } );
+                            $enthr->detach();
+                        }
+                    }
+                }
+                $lastwavchecktime = time();
+            }
+        }
+
 		sleep 1;
 	}
 
 	logger("periodic thread exiting");
+}
+
+sub encode_wav_to_ogg {
+    my $this = shift;
+
+    my $storagedir = Thundaural::Server::Settings::storagedir();
+
+    my $pattern = Thundaural::Util::tmpnameprefix($storagedir, 'wav-encode').'*';
+    my @files = bsd_glob($pattern);
+    foreach my $f (@files) {
+        logger("cleaning up $f");
+        unlink($f) if (-f $f);
+    }
+
+	my $dbh = $this->_dbconnect();
+    my @tracks = ();
+    {
+	    lock(${$this->{-dblock}});
+
+        my $q = "select * from tracks where filename like ? order by random() limit 100";
+        my $sth = $dbh->prepare($q);
+        $sth->execute('%.wav');
+        while (my $track = $sth->fetchrow_hashref()) {
+            push(@tracks, $track);
+        }
+        $sth->finish;
+    }
+
+    while (my $track = shift @tracks) {
+        last if (!$main::run);
+        if (main::ripping_active()) {
+            logger("ripper is now active, aborting further background encoding");
+            last;
+        }
+        my $tf = sprintf('%s/%s', $storagedir, $track->{filename});
+        next if (! -s $tf);
+        my($performer, $album);
+        {
+            my($q, $sth);
+	        lock(${$this->{-dblock}});
+            $q = "select * from performers where performerid = ? limit 1";
+            $sth = $dbh->prepare($q);
+            $sth->execute($track->{performerid});
+            $performer = $sth->fetchrow_hashref();
+            $sth->finish;
+            $q = "select * from albums where albumid = ? limit 1";
+            $sth = $dbh->prepare($q);
+            $sth->execute($track->{albumid});
+            $album = $sth->fetchrow_hashref();
+            $sth->finish;
+        }
+
+        if ($album && $performer) {
+            my $oggenc = Thundaural::Server::Settings::program('oggenc');
+            if ($oggenc) {
+                my @x = ();
+                push(@x, '--quiet');
+                push(@x, '--tracknum', $track->{albumorder});
+                push(@x, '--artist', $performer->{name});
+                push(@x, '--title', $track->{name});
+                push(@x, '--album', $album->{name});
+                if (my $ripperversion = Thundaural::Server::Settings::audio_ripper_version()) {
+                    push(@x, '-c', 'RIPPER='.$ripperversion);
+                }
+                if ($album->{cdindexid}) {
+                    push(@x, '-c', 'ALBUMCDINDEXID='.$album->{cdindexid});
+                }
+                if ($album->{cddbid}) {
+                    push(@x, '-c', 'ALBUMCDDBID='.$album->{cddbid});
+                }
+                push(@x, '-c', 'METASOURCE='.$album->{source});
+                my $tmpoutfile = Thundaural::Util::mymktempname($storagedir, 'wav-encode', "track".$track->{trackid}.".ogg");
+                my $outfile = $track->{filename};
+                $outfile =~ s/\.wav$/.ogg/i;
+                my $absoutfile = sprintf('%s/%s', $storagedir, $outfile);
+                push(@x, '--output', $tmpoutfile);
+                my $absfilename = sprintf('%s/%s', $storagedir, $track->{filename});
+                push(@x, $absfilename);
+                if (-e $absoutfile) {
+                    logger("$absoutfile exists, will overwrite");
+                }
+                unshift(@x, $oggenc);
+                my $nice = Thundaural::Server::Settings::program('nice');
+                unshift(@x, $nice) if ($nice);
+                logger("encoding track ".$track->{trackid}." \"".$track->{filename}."\" to Ogg Vorbis");
+                system (@x);
+                if (-s $tmpoutfile) {
+                    if (rename($tmpoutfile, $absoutfile)) {
+	                    lock(${$this->{-dblock}});
+                        eval {
+                            $dbh->do("update tracks set filename = ? where trackid = ?", 
+                                {PrintError=>0, RaiseError=>1}, $outfile, $track->{trackid});
+                        };
+                        if ($@) {
+                            logger("database update failed: $@");
+                            unlink $tmpoutfile;
+                        } else {
+                            logger("updated ".$track->{trackid}." to be \"$outfile\"");
+                            unlink $absfilename;
+                        }
+                    } else {
+                        logger("unable to rename \"$tmpoutfile\" to \"$absoutfile\": $!");
+                    }
+                } else {
+                    logger("$outfile is empty after encoding");
+                }
+            } else {
+                logger("unable to find oggenc, not specified in configuration");
+            }
+        } else {
+            logger("unable to encode file \"".$track->{filename}."\", no album and performer, serious error in database");
+        }
+        sleep 2;
+    }
+    $background_encoding = 0;
 }
 
 sub enqueue_random_song {

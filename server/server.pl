@@ -57,9 +57,9 @@ our $run : shared = 1;
 
 my $dblock : shared = 0xfef1f0fa;
 
-my($periodic, $periodicthr) = Thundaural::Server::Threads::start_periodic(\$dblock);;
 my $playerthrs = Thundaural::Server::Threads::start_players(\$dblock);
 my $readerthrs = Thundaural::Server::Threads::start_readers(\$dblock);
+my($periodic, $periodicthr) = Thundaural::Server::Threads::start_periodic(\$dblock);;
 
 sleep 1; # give everything a chance to initialize
 
@@ -246,6 +246,15 @@ sub server {
 
 	sleep 2; # wait for other threads to exit
 	threads->yield();
+}
+
+sub ripping_active {
+    my $c = 0;
+    foreach my $dev (keys %$readerthrs) {
+        my $s = $readerthrs->{$dev}->{-object}->state();
+        $c++ if (defined($s) && $s ne 'idle');
+    }
+    return $c;
 }
 
 sub do_conversions {

@@ -5,17 +5,25 @@ use warnings;
 
 use Carp qw(cluck);
 use Data::Dumper;
-use Getopt::Long;
+use Getopt::Long qw(:config pass_through);
 use File::Glob ':glob';
 use Storable qw(freeze thaw);
 
-BEGIN {
-    # redirect STDERR to STDOUT -- avoid having to 
-    # invoke a shell in the caller to do redirection
-    select STDERR; $| = 1; select STDOUT; $| = 1; 
-    open(STDERR, '>&=STDOUT');
+if (defined($ARGV[0]) && $ARGV[0] eq '--passthru') {
+    shift @ARGV;
+    &passthru(@ARGV);
+    exit;
+}
 
-    setpgrp(0, $$) or die("setpgrp failed: $!\n");
+BEGIN {
+    select STDERR; $| = 1; select STDOUT; $| = 1; 
+    if (defined($ARGV[0]) && $ARGV[0] ne '--passthru') {
+        # redirect STDERR to STDOUT -- avoid having to 
+        # invoke a shell in the caller to do redirection
+        open(STDERR, '>&=STDOUT');
+
+        setpgrp(0, $$) or die("setpgrp failed: $!\n");
+    }
 }
 
 $SIG{__WARN__} = sub { cluck(@_); };
@@ -24,8 +32,10 @@ $SIG{__WARN__} = sub { cluck(@_); };
 # and the first one to succeed will be used.
 my $cdinfo_modules = ['MusicBrainzRemote', 'FreeDB'];
 
+eval "use Thundaural::Server::Settings;"; # this is to get the quick --passthru option to work above
+
 my $sx = {};
-my $taversion = "Thundaural v1.5 Audio Ripper";
+my $taversion = Thundaural::Server::Settings::audio_ripper_version();
 my $accepteddbversion = 5;
 my $bin_getcoverart = './getcoverart.php';
 my $preripped = 0;
@@ -486,7 +496,6 @@ sub rip_tracks {
 
     # determine which extractor to use
     my $ripperprg = &find_audio_ripper;
-    my $encodeprg = &find_audio_encoder;
 
     my $tracknum = 0;
     my $totaltracks = scalar @{$cdinfo->{tracks}};
@@ -497,50 +506,27 @@ sub rip_tracks {
         $dorip =~ s/\$cddevice/$sx->{cddevice}/g;
         $dorip =~ s/\$track/$tracknum/g;
 
-        my $outfile = Thundaural::Util::mymktempname(
-                $sx->{storagedir}, 
-                $sx->{cddevice}, 
-                sprintf('disc%s.track%02d.ogg', $cdinfo->{cddbid}, $tracknum)
-            );
-    
-        my $doenc = $encodeprg;
-        $doenc =~ s/\$outfile/$outfile/g;
-        $doenc =~ s/\$track/$tracknum/g;
+        #my $doenc = $encodeprg;
+        my($doenc, $outfile, $finalfile, $progressre, $inputsep) = &find_audio_encoder($cdinfo, $track, $tracknum);
 
+        my $tracklen = $track->{sectors} / 75; # in seconds
         my $artist = $track->{performer};
         my $title = $track->{trackname};
-        my $idtype = $cdinfo->{idtype};
-        my $cddbid = $cdinfo->{cddbid};
-        my $cdindexid = $cdinfo->{cdindexid};
-        my $album = $cdinfo->{album}->{albumname};
-        my $tracklen = $track->{sectors} / 75; # in seconds
-        my $metasource = $cdinfo->{source};
-        if (int($tracklen) != $tracklen) {
-            $tracklen = int($tracklen);
-            $tracklen++; # final second is not a whole second, just add one
-        }
-        $doenc =~ s/\$artist\b/$artist/g;
-        $doenc =~ s/\$title\b/$title/g;
-        $doenc =~ s/\$album\b/$album/g;
-        $doenc =~ s/\$taversion\b/$taversion/g;
-        $doenc =~ s/\$cdindexid\b/$cdindexid/g;
-        $doenc =~ s/\$cddbid\b/$cddbid/g;
-        $doenc =~ s/\$metasource\b/$metasource/g;
 
         #print "\nrunning\n\t$dorip\n\t$doenc\n";
         my $cmd = "( $dorip 2>/dev/null ) | ( $doenc 2>&1 ) |";
+        print "$cmd\n";
         my $startat = time();
         open(RIP, $cmd);
         my $oldsep = $/;
-        $/ = "\cM";
+        $/ = $inputsep;
         my $oldpct = 0;
         while(my $line = <RIP>) {
-            # [  3.8%] [ 0m45s remaining]
-            if (my($pct, $rem) = $line =~ m/\[\s*(\d+\.\d+)%\]\s+\[\s*(\d+m\d+s)\s+remaining\]/) {
+            if (my($pct) = $line =~ m/$progressre/) {
                 $pct = int($pct);
                 if ($pct ne $oldpct) {
                     my $speed = &calc_speed($tracklen, $startat, $pct);
-                    &dumpstatus('ripping', '', "0/$tracknum", $artist, $title, 0, $speed, $tracklen, $totaltracks, $startat, 0, $pct);
+                    &dumpstatus('ripping', '', "$tracknum/$totaltracks", $artist, $title, 0, $speed, $tracklen, '?', $startat, 0, $pct);
                     $oldpct = $pct;
                 }
             }
@@ -550,7 +536,8 @@ sub rip_tracks {
         my $runtime = time() - $startat;
         $track->{filename} = $outfile;
         $track->{sortdir} = &get_sort_dir($track->{performersort});
-        $track->{finalfilename} = sprintf("%s :: %s :: %02d :: %s.ogg", &unslash($artist), &unslash($album), $tracknum, &unslash($title));
+        #$track->{finalfilename} = sprintf("%s :: %s :: %02d :: %s.wav", &unslash($artist), &unslash($album), $tracknum, &unslash($title));
+        $track->{finalfilename} = $finalfile;
     }
 }
 
@@ -565,16 +552,16 @@ sub parse_command_line {
     my %options = (
         'help'=>\&usage,
         'output=s'=>\($sx->{output}),
-        'prog=s'=>\&set_prog,
-        'device=s'=>\($sx->{cddevice}),
-        'storagedir=s'=>\($sx->{storagedir}),
-        'dbfile=s'=>\($sx->{dbfile}),
+        'cddevice=s'=>\($sx->{cddevice}),
         'infofile=s'=>\($sx->{infofile})
     );
-    &mydie("invoked with invalid arguments")
-        unless GetOptions(%options);
+    #&mydie("invoked with invalid arguments")
+        exit unless GetOptions(%options);
     &mydie("'storable' and 'text' are the only allowed arguments to output\n")
         if ($sx->{output} !~ m/^(storable|text)$/);
+
+    $sx->{storagedir} = Thundaural::Server::Settings::storagedir();
+    $sx->{dbfile} = Thundaural::Server::Settings::dbfile();
 }
 
 sub usage {
@@ -588,7 +575,7 @@ $0 <option> ...
   --dbfile         the thundaural database file
 
 The following two options are mutually exclusive:
-  --device <d>     use cdrom device <d>, read data from physical
+  --cddevice <d>   use cdrom device <d>, read data from physical
                     media
   --infofile <f>   read album/track info from file <f>. don't rip 
                     from physical media. the file should be 
@@ -599,14 +586,14 @@ EOF
     exit;
 }
 
-sub set_prog {
-    my $opt = shift;
-    my $value = shift;
-                                                                                                                                                       
-    my($p, $path) = $value =~ m/^(\w+):(.+)$/;
-    &mydie("$path is not executable\n") unless (-x $path);
-    $sx->{_progs}->{$p} = $path;
-}
+#sub set_prog {
+#    my $opt = shift;
+#    my $value = shift;
+#                                                                                                                                                       
+#    my($p, $path) = $value =~ m/^(\w+):(.+)$/;
+#    &mydie("$path is not executable\n") unless (-x $path);
+#    $sx->{_progs}->{$p} = $path;
+#}
 
 
 sub verify_settings {
@@ -617,7 +604,7 @@ sub verify_settings {
             -w $sx->{storagedir});
 
     if (!$sx->{infofile}) {
-        &mydie("missing --device argument\n") unless ($sx->{cddevice});
+        &mydie("missing --cddevice argument\n") unless ($sx->{cddevice});
         &mydie("specified cdrom device (".$sx->{cddevice}.") is not readable\n")
             unless (-r $sx->{cddevice});
         $sx->{devname} = $sx->{cddevice};
@@ -710,7 +697,7 @@ sub find_audio_ripper {
     };
 
     foreach my $p (@progs) {
-        my $px = $sx->{_progs}->{$p};
+        my $px = Thundaural::Server::Settings::program($p);
         if ($px) {
             chomp $px;
             my $px = sprintf('%s %s', $px, $progopts->{$p});
@@ -722,6 +709,51 @@ sub find_audio_ripper {
 }
 
 sub find_audio_encoder {
+    my $free = &free_disk_space(); # returns value in megabytes
+    if (defined($free) && $free > 705) {
+        # there is enough space to rip to wav and do background encoding
+        return &find_audio_encoder_wav(@_);
+    }
+    return &find_audio_encoder_ogg(@_);
+}
+
+sub free_disk_space {
+    my $sd = $sx->{storagedir};
+    my $free;
+    if (open(X, "/bin/df $sd |")) {
+        my $line = <X>; # remove header line
+        $line = <X>; # data line
+        close(X);
+        (undef, undef, undef, $free) = split(/\s+/, $line);
+        $free /= 1024; # assume it's 1k blocks, divide by 1024 to get megs
+    }
+    return $free;
+}
+
+sub find_audio_encoder_wav {
+    my $cdinfo = shift;
+    my $track = shift;
+    my $tracknum = shift;
+
+    my $outfile = Thundaural::Util::mymktempname(
+            $sx->{storagedir}, 
+            $sx->{cddevice}, 
+            sprintf('disc%s.track%02d.wav', $cdinfo->{cddbid}, $tracknum)
+        );
+
+    my $artist = $track->{performer};
+    my $title = $track->{trackname};
+    my $album = $cdinfo->{album}->{albumname};
+    my $finalfile = sprintf("%s :: %s :: %02d :: %s.wav", &unslash($artist), &unslash($album), $tracknum, &unslash($title));
+    
+    return ("$0 --passthru '$outfile'", $outfile, $finalfile, '^\s*(\d+\.\d+)%', "\n");
+}
+
+sub find_audio_encoder_ogg {
+    my $cdinfo = shift;
+    my $track = shift;
+    my $tracknum = shift;
+
     my @opts = (
         '--tracknum "$track"',
         '--artist "$artist"',
@@ -735,10 +767,44 @@ sub find_audio_encoder {
         '-'
     );
     my $opts = join(' ', @opts);
-    my $px = $sx->{_progs}->{oggenc};
+    my $px = Thundaural::Server::Settings::program('oggenc');
     if ($px && -x $px) {
         my $px = sprintf('%s %s', $px, $opts);
-        return $px;
+
+        my $outfile = Thundaural::Util::mymktempname(
+                $sx->{storagedir}, 
+                $sx->{cddevice}, 
+                sprintf('disc%s.track%02d.ogg', $cdinfo->{cddbid}, $tracknum)
+            );
+
+        $px =~ s/\$outfile/$outfile/g;
+        $px =~ s/\$track/$tracknum/g;
+
+        my $artist = $track->{performer};
+        my $title = $track->{trackname};
+        my $idtype = $cdinfo->{idtype};
+        my $cddbid = $cdinfo->{cddbid};
+        my $cdindexid = $cdinfo->{cdindexid};
+        my $album = $cdinfo->{album}->{albumname};
+        my $tracklen = $track->{sectors} / 75; # in seconds
+        my $metasource = $cdinfo->{source};
+        if (int($tracklen) != $tracklen) {
+            $tracklen = int($tracklen);
+            $tracklen++; # final second is not a whole second, just add one
+        }
+        $px =~ s/\$artist\b/$artist/g;
+        $px =~ s/\$title\b/$title/g;
+        $px =~ s/\$album\b/$album/g;
+        $px =~ s/\$taversion\b/$taversion/g;
+        $px =~ s/\$cdindexid\b/$cdindexid/g;
+        $px =~ s/\$cddbid\b/$cddbid/g;
+        $px =~ s/\$metasource\b/$metasource/g;
+
+        my $finalfile = sprintf("%s :: %s :: %02d :: %s.ogg", &unslash($artist), &unslash($album), $tracknum, &unslash($title));
+
+        # [  3.8%] [ 0m45s remaining]
+        #if (my($pct, $rem) = $line =~ m/\[\s*(\d+\.\d+)%\]\s+\[\s*(\d+m\d+s)\s+remaining\]/) {
+        return ($px, $outfile, $finalfile, '\[\s*(\d+\.\d+)%\]\s+\[\s*(\d+m\d+s)\s+remaining\]', "\cM");
     }
     &dumpstatus('idle', 'unable to find audio encoder (oggenc) (was --prog specified?)');
     exit;
@@ -752,7 +818,7 @@ sub abortus {
 sub pid_using_device($) {
     my $d = shift;
 
-    my $p = $sx->{_progs}->{fuser};
+    my $p = Thundaural::Server::Settings::program('fuser');
     return undef unless ($p);
     my @x = `$p $d`;
     if (@x) {
@@ -815,6 +881,33 @@ sub calc_speed($$) {
     $speed = 0 if ($@);
     $speed = sprintf("%.5f", $speed);
     return $speed;
+}
+
+sub passthru {
+    my $outfile = shift;
+    my $blocksize = shift;
+
+    my $input = '';
+    if (!defined($blocksize) || $blocksize+0 < 16384) {
+        $blocksize = 16384;
+    }
+    if (read(STDIN, $input, 12) != 12) {
+        die("unable to read wav header: $!\n");
+    }
+    my($riff, $length, $wav) = unpack('NVN', $input);
+    if ($riff != 0x52494646 || $wav != 0x57415645) {
+        die("input does not appear to be in wav format\n");
+    }
+    open(OUTPUT, ">$outfile") or die("unable to write to $outfile: $!\n");
+    print OUTPUT $input;
+    my $totalbytes = 0;
+    while(my $bytesread = read(STDIN, $input, $blocksize)) {
+        print OUTPUT $input;
+        $totalbytes += $bytesread;
+        my $pct = ($totalbytes / $length) * 100;;
+        print STDERR sprintf('%.4f%% complete', $pct)."\n";
+    }
+    exit;
 }
 
 #    Thundaural Jukebox
