@@ -182,7 +182,8 @@ sub draw {
             }
             $this->lastframe($f);
             $this->erase();
-            return $this->request_blit(surface=>$ff, area=>$this->area(), sync=>1, name=>$name);
+            my $a = $this->area();
+            return $this->request_blit(surface=>$ff, area=>$a, sync=>1, name=>$name);
         }
     }
     return 0;
@@ -298,6 +299,7 @@ sub _mk_frame {
     }
     if ($resize) {
         my $area = $this->area();
+        #logger('resizing ratio is x%f y%f', $area->width() / $surf->width(), $area->height() / $surf->height());
         $surf = SDL::Tool::Graphic::zoom(undef,
                     $surf,
                     $area->width() / $surf->width(),
