@@ -19,6 +19,7 @@ use base 'Widget::Group';
 
 use Themes::Original::AlbumCover;
 use Themes::Original::NowPlayingInfo;
+use Themes::Original::VolumeSelect;
 use Themes::Original::VolumeLabel;
 
 sub widget_initialize {
@@ -38,11 +39,20 @@ sub widget_initialize {
     my $bgcolor = new SDL::Color(-r=>140, -g=>140, -b=>140);
     my $fgcolor = new SDL::Color(-r=>180, -g=>180, -b=>180);
     my $labelcolor = new SDL::Color(-r=>0, -g=>0, -b=>0);
+
     my $f = new SDL::TTFont(-name=>"./fonts/Vera.ttf", -size=>21, -bg=>$fgcolor, -fg=>$labelcolor);
-    my $w = new Widget::ProgressBar(name=>'volume', area=>$dsarea, bgcolor=>$bgcolor, fgcolor=>$fgcolor, font=>$f);
-    $w->type('bar');
-    $w->orientation('v');
-    $this->add_widget($w);
+    my $vs = new Themes::Original::VolumeSelect(name=>'volumeselect', area=>$dsarea, bgcolor=>$bgcolor, fgcolor=>$fgcolor, font=>$f);
+    $vs->type('bar');
+    $vs->orientation('v');
+    $this->add_widget($vs);
+
+    my %vicons = (loud=>348, quiet=>730);
+    foreach my $iconlabel (keys %vicons) {
+        my $r = new SDL::Rect(-width=>22, -height=>21, -x=>20, -y=>$vicons{$iconlabel});
+        my $i = new Widget::Button(name=>"volume-icon-$iconlabel", area=>$r);
+        $i->add_frame(file=>"images/volume-speaker-$iconlabel.png", resize=>0);
+        $this->add_widget($i);
+    }
 
     #my $vlarea = new SDL::Rect(-x=>55, -y=>370, -width=>40, -height=>360);
     #my $vl = new Themes::Original::VolumeLabel(name=>'volumelabel', area=>$vlarea);

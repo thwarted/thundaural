@@ -52,12 +52,12 @@ sub draw_info {
     @outputs = (shift @outputs); # just do the first one
     my @lines = ();
     foreach my $device (@outputs) {
-        {
-            my $volume = $this->{server}->volume($device);
-            my $c = $this->container();
-            my $w = $c->get_widget("volume");
-            $w->percent_full($volume);
-        }
+        #{
+            #my $volume = $this->{server}->volume($device);
+            #my $c = $this->container();
+            #my $w = $c->get_widget("volumeselect");
+            #$w->percent_full($volume);
+        #}
         my $nowtrk = $this->{server}->playing_on($device);
         if ($nowtrk) {
             # we're only doing the first entry, this is good, since there is only one coverart
