@@ -58,7 +58,7 @@ sub logger {
     if ($showcaller) {
         my($package, $filename, $line) = caller(0);
         my(undef, undef, undef, $subroutine) = caller(1);
-        if ($subroutine eq '(eval)') {
+        if (defined($subroutine) && $subroutine eq '(eval)') {
             (undef, undef, undef, $subroutine) = caller(2);
         }
         $subroutine = $package if (!$subroutine);
