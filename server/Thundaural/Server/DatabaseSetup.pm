@@ -635,28 +635,28 @@ sub v4_create_views {
 }
 
 sub upgrade_to_version5 {
-	# oh bother -- the size of the filename field isn't big enough
-	# recreate the tracks table, making it bigger
-	# then look for files in the database that don't end with a known
-	# extension (versions before 5 only support ogg, so we're good there)
-	# then glob to search for a matching filename.  If we find a single match,
-	# update the database with the full path.  If we find more than one (or none,
-	# but finding no matches should be impossible unless the database and/or
-	# filesystem changed out from under us) then emit a warning and continue.
-	logger("upgrading database to version 5");
+    # oh bother -- the size of the filename field isn't big enough
+    # recreate the tracks table, making it bigger
+    # then look for files in the database that don't end with a known
+    # extension (versions before 5 only support ogg, so we're good there)
+    # then glob to search for a matching filename.  If we find a single match,
+    # update the database with the full path.  If we find more than one (or none,
+    # but finding no matches should be impossible unless the database and/or
+    # filesystem changed out from under us) then emit a warning and continue.
+    logger("upgrading database to version 5");
 
-	$dbh->begin_work();
-        &v5_set_proper_various_artists_sortname();
-	&v5_create_larger_tracksfilename_column();
-	&v5_expand_filenames();
-        &v5_set_proper_front_cover_string();
-	$dbh->commit();
+    $dbh->begin_work();
+    &v5_set_proper_various_artists_sortname();
+    &v5_create_larger_tracksfilename_column();
+    &v5_expand_filenames();
+    &v5_set_proper_front_cover_string();
+    $dbh->commit();
 
-	&set_db_version(5);
+    &set_db_version(5);
 }
 
 sub v5_set_proper_various_artists_sortname {
-        my $q = "update performers set sortname = 'various artists' where name = 'Various Artists'";
+    my $q = "update performers set sortname = 'various artists' where name = 'Various Artists'";
 	eval { $dbh->do($q); };
 	die($@) if ($@);
 }
@@ -736,8 +736,8 @@ sub v5_expand_filenames {
 }
 
 sub v5_set_proper_front_cover_string {
-        my $q = "update albumimages set label = 'front cover' where label = 'front'";
-        $dbh->do($q);
+    my $q = "update albumimages set label = 'front cover' where label = 'front'";
+    $dbh->do($q);
 }
 
 1;
