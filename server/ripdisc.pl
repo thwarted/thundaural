@@ -92,6 +92,7 @@ my $cdinfo = &get_audiocd_info;
 
 	$dbh->begin_work();
 
+    my $trackcount = 0;
 	my $undorenames = {};
 	my $failed = 0;
 	TRANSACTION:
@@ -161,18 +162,16 @@ my $cdinfo = &get_audiocd_info;
 		# add each track
 		my $albumorder = 1;
 		foreach my $track (@{$cdinfo->{tracks}}) {
-			if (!$track->{filename} || !$track->{sortdir}) {
+			if (!$track->{filename} || !$track->{sortdir} ) {
 				next;
-				#$failed = "missing track file for track $albumorder";
-				#last TRANSACTION;
 			}
-                        if (! -e $track->{filename} && 
-                            ! -s $track->{filename} && 
-                            $track->{trackname} =~ m/data.+track/i) {
-                                next;
-                                # found a data track that refused to be ripped
-                                # don't consider this an error, just skip it
-                        }
+            if (! -e $track->{filename} && 
+                ! -s $track->{filename} ) {
+                #&& $track->{trackname} =~ m/data.+track/i) idiots who populate freedb put 'movies' rather than 'data track'
+                next;
+                # found a data track that refused to be ripped
+                # don't consider this an error, just skip it
+            }
 			my $sortdir = $track->{sortdir};
 			my $destdir = sprintf('%s/%s', $sx->{storagedir}, $sortdir);
 			mkdir($destdir, 0777);
@@ -218,10 +217,15 @@ my $cdinfo = &get_audiocd_info;
 			$sth->finish;
 			if ($e) { $failed = $e; last TRANSACTION; }
 			$albumorder++;
+            $trackcount++;
 		}
 
 		last TRANSACTION; # we only want to execute this loop once
 	}
+
+    if (!$trackcount) {
+        $failed = "no tracks were ripped";
+    }
 
 	if ($failed) {
 		$dbh->rollback();
