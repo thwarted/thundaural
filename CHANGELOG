@@ -19,6 +19,17 @@ changes from version 2.0 to 2.1
 - fixed warnings output by taripdisc when used with the --infofile option 
   and there is no cover art images found
 
+- taripdisc now uses the original filename extension when moving the audio
+  files around.  this was causing a problem when mp3 files were imported
+  with the tapersonalarchive script
+
+- file extensions could be in either case, don't assume, and thus match,
+  just lowercase
+
+- added an alphabet slider to the albums screen, to make navigating albums
+  easier and faster
+
+
 
 changes from version 1.7 to 2.0
 
