@@ -44,6 +44,7 @@ sub should_draw {
     my $this = shift;
     my %o = @_;
 
+    return 0 if (!$this->visible());
     return 0 if (!$this->{_s}->{lastupdate});
     return 0 if (!defined($this->{_s}->{updateevery}));
     my $ticks = $o{ticks};
@@ -55,21 +56,41 @@ sub draw {
     my $this = shift;
     my %o = @_;
 
-    if ($this->{_s}->{lastupdate} == -1) {
-        $this->draw_info(@_);
-        if (ref($this->{_s}->{surface})) {
-            $this->{_s}->{lastupdate} = 1;
-            return $this->request_blit(surface=>$this->{_s}->{surface}, area=>$this->area(), sync=>1, name=>$this->name());
-        }
-    }
     if ($this->should_draw(@_)) {
-        if ($this->draw_info(@_)) {
-            $this->{_s}->{lastupdate} = $o{ticks};
+        if ($this->{_s}->{lastupdate}) {
+            $o{force} = 1;
+        }
+        if ($this->draw_info(%o)) {
             if (ref($this->{_s}->{surface})) {
+                $this->{_s}->{lastupdate} = $o{ticks};
+                $this->erase();
                 return $this->request_blit(surface=>$this->{_s}->{surface}, area=>$this->area(), sync=>1, name=>$this->name());
             }
         }
     }
+    if ($this->{_s}->{lastupdate} == -1) {
+        $this->{_s}->{lastupdate} = $o{ticks};
+        $this->erase();
+        return $this->request_blit(surface=>$this->{_s}->{surface}, area=>$this->area(), sync=>1, name=>$this->name());
+    }
+
+#    if ($this->{_s}->{lastupdate} == -1) {
+#        $this->draw_info(@_);
+#        if (ref($this->{_s}->{surface})) {
+#            $this->{_s}->{lastupdate} = 1;
+#            $this->erase();
+#            return $this->request_blit(surface=>$this->{_s}->{surface}, area=>$this->area(), sync=>1, name=>$this->name());
+#        }
+#    }
+#    if ($this->should_draw(@_)) {
+#        if ($this->draw_info(@_)) {
+#            $this->{_s}->{lastupdate} = $o{ticks};
+#            if (ref($this->{_s}->{surface})) {
+#                $this->erase();
+#                return $this->request_blit(surface=>$this->{_s}->{surface}, area=>$this->area(), sync=>1, name=>$this->name());
+#            }
+#        }
+#    }
 }
 
 sub redraw {

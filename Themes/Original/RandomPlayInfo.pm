@@ -37,7 +37,6 @@ sub widget_initialize {
 
     $this->{font} = new SDL::TTFont(-name=>"./fonts/Vera.ttf", -size=>20, -bg=>$this->{bgcolor}, -fg=>$this->{fgcolor});
 
-    $this->redraw();
     $this->{lastupdate} = 0;
     $this->{lastlines} = '';
 
@@ -64,7 +63,6 @@ sub draw_info {
     push(@lines, "ticks = $ticks");
     my $x = freeze(\@lines);
     if ($x ne $this->{lastlines}) {
-        $this->erase();
         my $area = $this->area();
         my $s = new SDL::Surface(-width=>$area->width(), -height=>$area->height(), -depth=>32);
         $this->{font}->print_lines_justified(just=>0, surf=>$s, x=>$this->area()->width()/2, y=>10, lines=>\@lines);

@@ -33,7 +33,7 @@ sub widget_initialize {
     $this->add_widget(new Themes::Original::AlbumNext(name=>'albumnext'));
     $this->add_widget(new Themes::Original::AlbumSlider(name=>'albumslider'));
 
-    $this->{album_offset} = 0; #254;
+    $this->{album_offset} = 279;
 
     my $positions = [ 
                         #[   2,120, 50],
@@ -52,7 +52,6 @@ sub widget_initialize {
     my $start_albums = $this->{server}->albums(offset=>$this->{album_offset}, count=>$this->{albums_per_page});
     $this->{albumbuttons} = [];
     foreach my $pos (@{$positions}) {
-        logger("o = $o, c = $c");
         my($x, $y, $s) = @$pos;
         my $p = new SDL::Rect(-x=>$x, -y=>$y, -width=>$s, -height=>$s);
         my $name = "albumselect$c";
@@ -123,6 +122,7 @@ sub adjust_album_offset {
             $pct = 0;
         }
         $this->get_widget('albumslider')->percent_full($pct);
+        logger("album offset is $offset");
     }
 }
 

@@ -130,7 +130,7 @@ sub coverart {
     my $albumid = $o{albumid};;
     my $outputfile = $o{outputfile};
 
-    return '/dfdf' if (rand(50) > 25);
+    #return '/dfdf' if (rand(50) > 25);
 
     my $bytes = $this->_do_cmd("coverart $albumid");
     if (!$bytes || $bytes =~ m/^\d{3}$/) {
@@ -403,23 +403,23 @@ sub playing_on {
     my $this = shift;
     my $channel = shift;
 
-    return 
-    new Thundaural::Client::Track(info=>{
-    devicename=>'main',
-    type=>'play',
-    state=>'idle',
-    volume=>int(rand(99)),
-    trackref=>'6/1',
-    performer=>'The Beatles',
-    name=>"Sgt. Pepper's Lonely Hearts Club Band",
-    popularity=>0.055413,
-    rank=>8,
-    length=>123,
-    trackid=>39,
-    started=>time(),
-    current=>55,
-    percentage=>55/123
-    });
+#    return 
+#    new Thundaural::Client::Track(info=>{
+#    devicename=>'main',
+#    type=>'play',
+#    state=>'idle',
+#    volume=>int(rand(99)),
+#    trackref=>'6/1',
+#    performer=>'The Beatles',
+#    name=>"Sgt. Pepper's Lonely Hearts Club Band",
+#    popularity=>0.055413,
+#    rank=>8,
+#    length=>123,
+#    trackid=>39,
+#    started=>time(),
+#    current=>55,
+#    percentage=>55/123
+#    });
 
     $this->_populate_status();
     if (!$channel) {
@@ -473,10 +473,10 @@ sub queued_on {
     my $this = shift;
     my $channel = shift;
 
-    return [
-        $this->playing_on(), $this->playing_on(), $this->playing_on(), $this->playing_on(), $this->playing_on(),
-        $this->playing_on(), $this->playing_on(), $this->playing_on(), $this->playing_on(), $this->playing_on()
-    ];
+#    return [
+#        $this->playing_on(), $this->playing_on(), $this->playing_on(), $this->playing_on(), $this->playing_on(),
+#        $this->playing_on(), $this->playing_on(), $this->playing_on(), $this->playing_on(), $this->playing_on()
+#    ];
 
     croak("must pass channel name to queued_on") if (!$channel);
     $this->_populate_queued_on();

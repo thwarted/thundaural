@@ -26,7 +26,7 @@ sub widget_initialize {
     $this->SUPER::widget_initialize(@_);
 
     my $area = $this->area();
-    $this->update_every(2100);
+    $this->update_every(50);
 
     $this->{server} = $main::client;
 
@@ -40,18 +40,18 @@ sub widget_initialize {
     $this->{lastupdate} = 0;
     $this->{lastlines} = '';
     $this->{lasttrackref} = 0;
-
 }
 
 sub draw_info {
     my $this = shift;
     my %o = @_;
     my $ticks = $o{ticks};
+    my $force = $o{force};
 
-    my @lines = ('hello', 'badfdsf', 'adfadfas', 'keriasfk dkfdkf dkf adkf');
+    my @lines = (time(), 'hello', 'badfdsf', 'adfadfas', 'keriasfk dkfdkf dkf adkf');
     my $x = freeze(\@lines);
-    if ($x ne $this->{lastlines}) {
-        $this->erase();
+    if ($force || $x ne $this->{lastlines}) {
+        $this->update_every(2100);
         my $area = $this->area();
         my $s = new SDL::Surface(-width=>$area->width(), -height=>$area->height(), -depth=>32);
         $s->fill(0, $this->{bgcolor});

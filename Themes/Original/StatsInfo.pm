@@ -27,7 +27,7 @@ sub widget_initialize {
     $this->SUPER::widget_initialize(@_);
 
     my $area = $this->area();
-    $this->update_every(5000);
+    $this->update_every(50);
 
     $this->{server} = $main::client;
 
@@ -46,11 +46,13 @@ sub widget_initialize {
 sub draw_info {
     my $this = shift;
     my %o = @_;
+    my $force = $o{force};
 
     my $st = $this->{server}->stats();
     my $ss = freeze($st);
 
-    if (!exists($this->{lastlines}) || $this->{lastlines} ne $ss) {
+    if ($force || !exists($this->{lastlines}) || $this->{lastlines} ne $ss) {
+        $this->update_every(5000);
         $this->{lastlines} = $ss;
 
         my $supsince = time() - $st->{'uptime-server'};
@@ -95,7 +97,6 @@ sub draw_info {
         my $area = $this->area();
         my $s = new SDL::Surface(-width=>$area->width(), -height=>$area->height(), -depth=>32);
         $this->{font}->print_lines_justified(just=>-1, surf=>$s, x=>10, y=>10, lines=>\@lines);
-        $this->erase();
         $this->surface($s);
 
         {

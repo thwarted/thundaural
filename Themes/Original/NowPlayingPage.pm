@@ -41,7 +41,8 @@ sub widget_initialize {
     my $labelcolor = new SDL::Color(-r=>0, -g=>0, -b=>0);
 
     my $f = new SDL::TTFont(-name=>"./fonts/Vera.ttf", -size=>21, -bg=>$fgcolor, -fg=>$labelcolor);
-    my $vs = new Themes::Original::VolumeSelect(name=>'volumeselect', area=>$dsarea, bgcolor=>$bgcolor, fgcolor=>$fgcolor, font=>$f);
+    my $vs = new Widget::ProgressBar(name=>'volumeselect', area=>$dsarea, bgcolor=>$bgcolor, fgcolor=>$fgcolor, font=>$f);
+    $vs->set_onClick( sub { my $this = shift; my %o = @_; $this->percent_full($o{percentage}); } );
     $vs->type('bar');
     $vs->orientation('v');
     $this->add_widget($vs);

@@ -21,7 +21,7 @@ sub new {
         # it sure is cool to fill up the track listing to hide 
         # your hidden track
         # when I grow up I want to be cool like bands that do this
-        logger("track %s is empty", $o{trackref});
+        logger("track %s is empty", $o{info}->{trackref});
         return undef;
     }
 
