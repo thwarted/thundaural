@@ -1,3 +1,20 @@
+changes from version 1.7 to 2.0
+
+- new directory structure, moving all the programs out of client/ and server/
+  and into the package root.  the scripts were also renamed to start with the
+  prefix "ta" (for _T_hund_A_ural).  All perl modules are moved into the lib/
+  directory.
+
+- client has been completely rewritten to be more modular
+
+- new client code supports different themes.  The interface is still closely 
+  tied to the (theme's) code, so it's not trivial to create a new theme, but 
+  different themes can be created without interfering with the base, original
+  theme
+
+- 
+
+
 changes from version 1.6 to version 1.7
 
 - either rerun checkdeps and generate a new .conf file or edit your 
