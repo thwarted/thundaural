@@ -2,9 +2,12 @@
 
 package Thundaural::Logger;
 
+use strict;
+use warnings;
+
 use Exporter;
-@ISA = qw(Exporter);
-@EXPORT_OK = qw(logger);
+our @ISA = qw(Exporter);
+our @EXPORT_OK = qw(logger);
 
 use Sys::Syslog;
 use File::Basename;
@@ -62,7 +65,7 @@ sub logger {
         $prefix = "$subroutine($line): ";
     }
     my $format = shift;
-    $msg = sprintf($format, @_);
+    my $msg = sprintf($format, @_);
     if ($mode eq 'file') {
         printf $FH '%s%s%s', $prefix, $msg, "\n";
     } else {
@@ -88,4 +91,3 @@ sub logger {
 #    You should have received a copy of the GNU General Public License
 #    along with this program; if not, write to the Free Software
 #    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-
