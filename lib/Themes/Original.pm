@@ -77,11 +77,13 @@ sub show_page {
     }
 
     # show only one
-    my $w = $this->get_widget($showpage);
-    if ($w) {
-        $w->visible(1);
-    } else {
-        logger("unable to find page widget $showpage");
+    if ($showpage) {
+        my $w = $this->get_widget($showpage);
+        if ($w) {
+            $w->visible(1);
+        } else {
+            logger("unable to find page widget $showpage");
+        }
     }
 
     $this->{current_page} = $showpage;
@@ -90,11 +92,12 @@ sub show_page {
 sub heartbeat {
     my $this = shift;
 
-    if ((my $x = $main::client->albums_count()) != $this->{lastalbumcount}) {
+    my $alcnt = $main::client->albums_count();
+    if ($alcnt != $this->{lastalbumcount}) {
         if (my $w = $this->get_widget('AlbumsPage')) {
             $w->update_albumbuttons();
         }
-        $this->{lastalbumcount} = $x;
+        $this->{lastalbumcount} = $alcnt;
     }
 
     my $devices = $main::client->devices('play');
