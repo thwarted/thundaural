@@ -168,10 +168,10 @@ sub draw {
             } else {
                 # vertically oriented
                 my $linethick = $this->line_thickness();
-                my $pos = int($area->height() * $o->{pctfull});
+                my $pos = int($area->height() * (1 - $o->{pctfull}) );
                 $pos = $area->height() - $linethick if ($pos >= $area->height());
                 $pos = 0 if ($pos < 0);
-                $fillrect = new SDL::Rect(-width=>$area->width(), -height=>$linethick, -x=>0, -y=>$pos);
+                $fillrect = new SDL::Rect(-width=>$area->width(), -x=>0, -height=>$linethick, -y=>$pos);
             }
         } else {
             # bar style
@@ -184,11 +184,11 @@ sub draw {
                 $fillrect = new SDL::Rect(-width=>$pos, -height=>($area->height()-2), -x=>1, -y=>1);
             } else {
                 # vertically oriented
-                my $pos = int($area->height() * $o->{pctfull});
+                my $pos = int($area->height() * (1 - $o->{pctfull}) );
                 $pos = $area->height() if ($pos > $area->height());
                 $pos -= 2; # account for the border
-                $pos = 0 if ($pos < 0);
-                $fillrect = new SDL::Rect(-width=>$area->width(), -height=>$pos, -x=>1, -y=>1);
+                $pos = 2 if ($pos < 2);
+                $fillrect = new SDL::Rect(-width=>$area->width()-2, -x=>1, -height=>$area->height()-$pos, -y=>$pos-1);
             }
         }
         $o->{surf}->fill($fillrect, $o->{fgcolor});
@@ -226,7 +226,8 @@ sub onMouseUp_interior {
     if ($this->{_pb}->{orient} eq 'h') {
         $pct = ($event->motion_x() - $area->x()) / $area->width();
     } else {
-        $pct = ($event->motion_y() - $area->y()) / $area->height();
+        # grows upward
+        $pct = 1 - ($event->motion_y() - $area->y()) / $area->height();
     }
     $this->onClick(percentage=>$pct);
 }
