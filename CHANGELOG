@@ -1,4 +1,16 @@
-changes to version 1.6
+changes from version 1.6 to version 1.7
+
+- either rerun checkdeps and generate a new .conf file or edit your 
+  conf file and change the line:
+
+     cmd ripcdrom:ripdisc.pl --dbfile ${DBFILE} --device ${DEVICEFILE} --storagedir ${STORAGEDIR} ${PROGOPTS}
+  to
+
+     cmd ripcdrom:ripdisc.pl --dbfile ${DBFILE} --cddevice ${DEVICEFILE} --storagedir ${STORAGEDIR} ${PROGOPTS}
+
+  note that the --device argument changed to --cddevice.  This is because
+  the ripdisc script now uses the same command line parsing code that
+  the server script uses.
 
 - 'devices' command was including private entries (those that had a type
   that began with an underscore)
@@ -7,6 +19,20 @@ changes to version 1.6
   don't create functions while in a transaction
   ->prepare now fails on critical errors that used to happen in ->execute
   
+- will now rip to WAV, which is faster, and encode to ogg in the background
+  if there is at least 700 meg of free space on the filesystem that contains
+  the storage dir.
+
+- album-images.pl is included in the server directory
+
+- See the file server/ADDING_PERSONAL_ARCHIVE.txt for information on using
+  the personal-archive-load.pl script and the new features of ripdisc.pl to
+  populate the thundaural database with tracks you obtained without having
+  physical media, such as purchasing online.  Includes a preconfigured
+  mode for loading tracks purchased from popular on-line music retailers,
+  with more to come in the future.
+
+
 
 changes from version 1.5.1 to version 1.6
 
