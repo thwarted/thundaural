@@ -95,9 +95,9 @@ sub run {
 	my $storagedir = Thundaural::Server::Settings::storagedir();
 
     my $readersidlesince = time();
-    my $wavcheckfreq = 60;
+    my $wavcheckfreq = 60 * 15;
     my $lastwavchecktime = 0;
-    my $encodeidlewaittime = 60 * 5;
+    my $encodeidlewaittime = 60 * 60;
 
 	my $statsupdatefreq = 60 * 3;
 	my $laststatstime = time() - $statsupdatefreq;
