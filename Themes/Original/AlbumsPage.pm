@@ -130,11 +130,6 @@ sub hide_nav_buttons {
     my $offset = $this->{album_offset};
     my $total = $main::client->albums_count();
     my $max = $total - $this->{albums_per_page};
-    $max = $total if ($max < $total);
-
-    #logger("offset = $offset");
-    #logger("total = $total");
-    #logger("max = $max");
 
     if ($offset == 0 && $total < scalar @{$this->{albumbuttons}}) {
         $this->get_widget('albumprev')->visible(0);
@@ -164,6 +159,7 @@ sub update_albumbuttons {
     map {
         my $w = $this->get_widget(shift @buttons);
         $w->set_album(album=>$_);
+        $w->visible(1);
     } @{$page_albums};
 }
 
