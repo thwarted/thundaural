@@ -8,6 +8,15 @@ changes from version 2.0 to 2.1
 - the default poll time for wav files to convert to ogg was increased 
   significantly
 
+- changed the default number of sectors value (-n) on dagrab to 8.  It was
+  64, in an attempt to speed up ripping.  64 caused some pretty serious
+  defects on some newer discs on my production machine.  If you want to try
+  speeding up your ripping speed using dagrab, experiment on the command 
+  line by invoking dagrab with different values for -n to find out what
+  works for you.  The default of 8 should be safe for most combinations of
+  discs and drives.
+
+
 
 changes from version 1.7 to 2.0
 
