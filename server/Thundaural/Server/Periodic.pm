@@ -240,6 +240,8 @@ sub _update_track_ranks {
 			$seensongs++;
 			$rank = $seensongs if ($pop != $lastpop);
 			$lastpop = $pop;
+            # calculate percentile using:
+            # Ceiling [(Rank*X)/(Count + 1)]
 			my $q = "update tracks set popularity = $pop, rank = $rank where trackid = $trackid";
 			$this->{-dbh}->do($q);
 		}
