@@ -58,7 +58,7 @@ sub new {
 	$this->{-storagedir} = '/home/storage';
 
 	$this->{-font} = new SDL::TTFont(
-				-name=>'/usr/share/fonts/msfonts/georgia.ttf',
+				-name=>'./fonts/Vera.ttf',
 				-size=>14,
 				-bg=>new SDL::Color(-r=>180,-g=>180,-b=>180),
 				-fg=>new SDL::Color(-r=>0,-g=>0,-b=>0)
@@ -279,7 +279,6 @@ sub _make_album_cover($) {
 	my $failed = 1;
 	my $file = $this->{-albums}->coverartfile($alid);
 	if ($file) {
-		$file = sprintf('%s/%s', $this->{-storagedir}, $file);
 		if (-s $file) {
 			eval {
 				$x = new SDL::Surface(-name=>$file);

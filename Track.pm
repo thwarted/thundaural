@@ -1,10 +1,9 @@
 
 package Track;
 
-# $Header: /home/cvs/thundaural/client/Track.pm,v 1.2 2003/12/27 10:42:51 jukebox Exp $
+# $Header: /home/cvs/thundaural/client/Track.pm,v 1.3 2004/01/27 08:10:05 jukebox Exp $
 
 use strict;
-use DBI;
 use Album;
 
 use Logger;

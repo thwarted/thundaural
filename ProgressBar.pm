@@ -2,7 +2,7 @@
 
 package ProgressBar;
 
-# $Header: /home/cvs/thundaural/client/ProgressBar.pm,v 1.3 2003/12/31 19:20:04 jukebox Exp $
+# $Header: /home/cvs/thundaural/client/ProgressBar.pm,v 1.4 2004/01/30 05:35:02 jukebox Exp $
 
 use strict;
 use SDL;
@@ -164,7 +164,7 @@ sub draw {
 
 		if ($this->{-label} && ref($this->{-labelfont}) eq 'SDL::TTFont') {
 			my $width = $this->{-labelfont}->width($this->{-label});
-			$this->{-labelfont}->print($new, ($drect->width - $width) / 2, -2, $this->{-label});
+			$this->{-labelfont}->print($new, ($drect->width - $width) / 2, 0, $this->{-label});
 		}
 
 		$new->blit(0, $canvas, $drect);
