@@ -35,7 +35,7 @@ sub open {
 
 	foreach my $mod (@foundmods) {
 		my $re = $exts{$mod};
-		if ($file =~ m/$re/) {
+		if ($file =~ m/$re/i) {
 			return new $mod(%o);
 		}
 	}
