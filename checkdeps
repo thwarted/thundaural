@@ -97,16 +97,17 @@ if ($check_server) {
 		&ok;
 	}
 
-	my @programs = (
-		{ 'for'=>'ripping audio', 'type'=>'oneof', 'list'=>['dagrab', 'cdda2wav', 'cdparanoia'] },
-		{ 'for'=>'audio info extracting', 'type'=>'must', 'list'=>'cdda2wav' },
-		# --version doesn't work for cdda2wav version 1, but --help does work on both
-		{ 'for'=>'cdda2wav version', 'type'=>'grep', 'pattern'=>'^Version 2', 'list'=>'cdda2wav --help 2>&1' },
-		{ 'for'=>'changing the volume', 'label'=>'aumix', 'type'=>'oneof', 'list'=>['aumix-minimal', 'aumix'] },
-		{ 'for'=>'encoding audio', 'type'=>'must', 'list'=>'oggenc' },
-		{ 'for'=>'determining device usage', 'type'=>'must', 'list'=>'fuser' },
-		{ 'for'=>'downloading cover art', 'type'=>'must', 'list'=>'php' },
-	);
+    my @programs = (
+        { 'for'=>'ripping audio', 'type'=>'oneof', 'list'=>['dagrab', 'cdda2wav', 'cdparanoia'] },
+        { 'for'=>'audio info extracting', 'type'=>'must', 'list'=>'cdda2wav' },
+        # --version doesn't work for cdda2wav version 1, but --help does work on both
+        { 'for'=>'cdda2wav version', 'type'=>'grep', 'pattern'=>'^Version 2', 'list'=>'cdda2wav --help 2>&1' },
+        { 'for'=>'changing the volume', 'label'=>'aumix', 'type'=>'oneof', 'list'=>['aumix-minimal', 'aumix'] },
+        { 'for'=>'encoding audio', 'type'=>'must', 'list'=>'oggenc' },
+        { 'for'=>'determining device usage', 'type'=>'must', 'list'=>'fuser' },
+        { 'for'=>'running programs at low priority', 'type'=>'must', 'list'=>'nice' },
+        { 'for'=>'downloading cover art', 'type'=>'must', 'list'=>'php' },
+    );
 
 	NEXTPROG:
 	foreach my $prog (@programs) {
@@ -389,7 +390,7 @@ device main:play=/dev/dsp:mixer=/dev/mixer
 device cdrom:read=/dev/cdrom
  
 # relative to homedir if it doesn't begin with a /
-cmd ripcdrom:ripdisc.pl --dbfile ${DBFILE} --device ${DEVICEFILE} --storagedir ${STORAGEDIR} ${PROGOPTS}
+cmd ripcdrom:ripdisc.pl --dbfile ${DBFILE} --cddevice ${DEVICEFILE} --storagedir ${STORAGEDIR} ${PROGOPTS}
 cmd volumeset:/usr/bin/aumix -d ${DEVICEFILE} -w100 -v${VOLUME}
 cmd volumequery:/usr/bin/aumix -d ${DEVICEFILE} -q
 EOF
