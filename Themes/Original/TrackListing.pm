@@ -18,6 +18,7 @@ use Themes::Original::TrackSelect;
 use Themes::Original::AlbumCover;
 use Themes::Original::TrackScrollPrev;
 use Themes::Original::TrackScrollNext;
+use Themes::Original::PlayAllButton;
 
 use base 'Widget::Group';
 
@@ -67,6 +68,10 @@ sub widget_initialize {
     $this->{headerfgcolor} = new SDL::Color(-r=>0, -g=>0, -b=>0);
     $this->{headerfont} = new SDL::TTFont(-name=>"./fonts/Vera.ttf", -size=>20, -bg=>$this->{headerbgcolor}, -fg=>$this->{headerfgcolor});
 
+    my $apbarea = new SDL::Rect(-x=>10, -y=>400, -width=>150, -height=>60);
+    my $apb = new Themes::Original::PlayAllButton(name=>'playall', area=>$apbarea);
+    $this->add_widget($apb);
+
     $this->{top} = 0;
 
     #logger("\n\t".join("\n\t", map { $_->name() } @{$this->widgets()} ));
@@ -82,10 +87,15 @@ sub show_album_tracks {
         $w->set_album(album=>$this->{album});
     }
 
+    if (my $w = $this->get_widget('playall')) {
+        $w->set_album(album=>$this->{album});
+    }
+
     if (my $w = $this->get_widget('header')) {
         my $s = $w->surface();
-        $s->fill(0, $this->{headerbgcolor});
         my $area = $w->area();
+        $this->container()->draw_background(canvas=>$s, dest=>0, source=>$area);
+        #$s->fill(0, $this->{headerbgcolor});
         my $xcenter = int($area->width()) / 2;
         my @lines = ($this->{album}->performer(), $this->{album}->name());
         $this->{headerfont}->print_lines_justified(just=>0, surf=>$s, x=>$xcenter, y=>0, lines=>\@lines);
