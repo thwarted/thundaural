@@ -16,6 +16,8 @@ use Thundaural::Client::Album;
 
 my $PROTOCOL_VERSION = '4';
 
+my @letter_offsets = ('#', 'a'..'z');
+
 sub new {
     my $class = shift;
     my $proto = ref($class) || $class;
@@ -70,6 +72,7 @@ sub clear_cache {
     $this->{statslastupdate} = 0;
     $this->{deviceslastupdate} = 0;
     $this->{_albums} = {lastupdate=>0, list=>{}};
+    $this->{_album_letter_offsets} = {};
 }
 
 sub _albums_populate {
@@ -83,6 +86,26 @@ sub _albums_populate {
             $this->{_albums}->{list}->{$al->{albumid}} = $al;
         }
         $this->{_albums}->{sorted_performer} = $this->_sort_by('sortname', 'name');
+        my $lastp = '';
+        my $o = 0;
+        my $p;
+        $this->{_album_letter_offsets} = {};
+        #foreach my $a1 (@letter_offsets) {
+            #$this->{_album_letter_offsets}->{$a1} = undef;
+        #}
+        foreach my $a1 (@{$this->{_albums}->{sorted_performer}}) {
+            my $al = $this->{_albums}->{list}->{$a1};
+            ($p) = $al->{sortname} =~ m/^\s*(.)/;
+            $p = lc $p;
+            $p = $letter_offsets[0] unless ($p =~ m/[a-z]/);
+            if ($p ne $lastp) {
+                $this->{_album_letter_offsets}->{$p} = $o 
+                    unless exists($this->{_album_letter_offsets}->{$p});
+            }
+            $o++;
+            $lastp = $p;
+        }
+        $this->{_album_letter_offsets}->{$p} = $o;
     } else {
         $this->{_albums}->{list} = {};
     }
@@ -128,6 +151,75 @@ sub albums {
     return \@ret;
 }
 
+sub album_offset_from_prefix {
+    my $this = shift;
+    my %o = @_;
+    my $letter = $o{letter};
+
+    $this->_albums_populate();
+    if ($letter eq '#') {
+        return 0; # always at beginning
+    }
+    $letter = lc $letter;
+    my $r;
+    my $c = 0;
+    # find the smallest offset larger than the letter's offset
+    # we only operate on the a..z range here, moving backward from $letter
+    while(!defined($r = $this->{_album_letter_offsets}->{$letter})) {
+        $letter = chr(ord($letter)-1);
+        $c++;
+        last if ($c == 25);
+    }
+    $r = 0 unless($r);
+    return $r;
+}
+
+sub album_prefix_from_percentage {
+    my $this = shift;
+    my %o = @_;
+    my $pct = $o{percentage};
+
+    my $p = int($pct * (scalar @letter_offsets));
+    return $letter_offsets[$p];
+}
+
+sub album_prefix_percentage_from_offset {
+    my $this = shift;
+    my %o = @_;
+    my $offset = $o{offset};
+
+    my $prefix = $this->album_prefix_from_offset(offset=>$offset);
+    my $c = 0;
+    foreach my $letter (@letter_offsets) {
+        last if ($letter eq $prefix);
+        $c++;
+    }
+    return $c / (scalar @letter_offsets);
+}
+
+sub album_prefixes {
+    return (@letter_offsets);
+}
+
+sub album_prefix_from_offset {
+    my $this = shift;
+    my %o = @_;
+    my $offset = $o{offset};
+
+    my $last = '#';
+    foreach my $letter (@letter_offsets) {
+        if (exists($this->{_album_letter_offsets}->{$letter})) {
+            return $letter
+                if ($offset == $this->{_album_letter_offsets}->{$letter});
+
+            return $last
+                if ($offset < $this->{_album_letter_offsets}->{$letter});
+        }
+        $last = $letter;
+    }
+    return $last;
+}
+
 sub album_hash {
     my $this = shift;
     my %o = @_;
@@ -151,7 +243,7 @@ sub _precache_coverart {
         $a = $this->{_albums}->{list}->{$a};
         $a = new Thundaural::Client::Album(info=>{%$a}, server=>$this, albumid=>$a->{albumid});
         my $x = $a->coverartfile();
-        print "precached $x\n";
+        #print "precached $x\n";
     }
 }
 
