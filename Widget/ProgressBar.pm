@@ -119,8 +119,11 @@ sub percent_full {
 
     my $x = $this->{_pb}->{pctfull};
     if (@_) {
-        $this->{_pb}->{pctfull} = shift @_;
-        $this->{_pb}->{changed} = 1;
+        my $y = shift @_;
+        if ($this->{_pb}->{pctfull} != $y) {
+            $this->{_pb}->{changed} = 1;
+        }
+        $this->{_pb}->{pctfull} = $y;
     }
     return $x;
 }
@@ -130,8 +133,11 @@ sub label {
 
     my $oldlabel = $this->{_pb}->{label};
     if (@_) {
-        $this->{_pb}->{label} = shift @_;
-        $this->{_pb}->{changed} = 1;
+        my $x = shift @_;
+        if ($this->{_pb}->{label} ne $x) {
+            $this->{_pb}->{changed} = 1;
+        }
+        $this->{_pb}->{label} = $x;
     }
     return $oldlabel;
 }
@@ -199,7 +205,7 @@ sub draw {
             $o->{font}->print($o->{surf}, $x, 0, $o->{label});
         }
         $this->{_pb}->{changed} = 0;
-        return $this->request_blit(surface=>$o->{surf}, area=>$area, sync=>1, name=>'progbar');
+        return $this->request_blit(surface=>$o->{surf}, area=>$area, sync=>1, name=>$this->name());
     }
     return 0;
 }
