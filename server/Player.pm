@@ -2,7 +2,7 @@
 
 package Player;
 
-# $Header: /home/cvs/thundaural/server/Player.pm,v 1.2 2004/01/08 06:12:02 jukebox Exp $
+# $Header: /home/cvs/thundaural/server/Player.pm,v 1.3 2004/01/09 07:08:06 jukebox Exp $
 
 use strict;
 use warnings;
@@ -14,6 +14,8 @@ use Thread::Queue;
 use File::Basename;
 
 use IPC::Open2;
+
+use DBI;
 
 use Settings;
 use Logger;
@@ -64,7 +66,7 @@ sub _dbconnect {
 	my $dbfile = $this->{-dbfile};
 	if ($dbfile) {
 		$this->{-dbh} = DBI->connect("dbi:SQLite:dbname=$dbfile","","");
-		Logger::logger("dbh is ".$this->{-dbh}, $this->{-device}." player");
+		Logger::logger("dbh is ".$this->{-dbh});
 	}
 }
 
@@ -157,11 +159,11 @@ sub run {
 		my $pid = open2($plread, $plwrite, @ppargs);
 		my $c = 0;
 		while($this->{-cmdqueue}->pending()) { $this->{-cmdqueue}->dequeue(); $c++;} # empty the cmdqueue
-		Logger::logger("cleared player command queue of $c entries", 'player');
+		Logger::logger("cleared player command queue of $c entries");
 		$this->{-cmdqueue}->enqueue("load $filename");
 		Logger::logger("loading \"$filename\"");
 		${$this->{-track}} = sprintf("%d\t%d", $playtrack->{trackid}, time());
-		Logger::logger("set track to \"".${$this->{-track}}."\"", $this->{-device}." player");
+		Logger::logger("set track to \"".${$this->{-track}}."\"");
 		my($readthr, $writethr);
 		$readthr = threads->new(sub { $this->_read_status($plread); } );
 		$writethr = threads->new(sub { $this->_write_cmds($plwrite); } );
@@ -174,7 +176,7 @@ sub run {
 		${$this->{-track}} = undef;
 	}
 
-	Logger::logger("exiting", $this->{-device}.' player');
+	Logger::logger($this->{-device}." exiting");
 }
 
 # note that this is specific to ogg123 and mpg321, but has only been tested with ogg123
@@ -203,7 +205,7 @@ sub _read_status {
 			}
 			${$this->{-position}} = $pct;
 			if (($c++ % 45) == 0) {
-				Logger::logger($l, $this->{-device}.' output');
+				Logger::logger($l);
 			}
 			next;
 		}
@@ -231,7 +233,7 @@ sub _write_cmds {
 
 	my $success = 1;
 	while (my $cmd = $this->{-cmdqueue}->dequeue) {
-		#Logger::logger($cmd, $this->{-device}.' input');
+		#Logger::logger($cmd);
 		if ($cmd =~ m/^abort/) {
 			print $wh "quit\n";
 			close($wh);
@@ -262,7 +264,7 @@ sub trackinfo($) {
 		lock(${$this->{-dblock}});
 		my $q = "select * from tracks where trackid = ?";
 		my $sth = $this->{-dbh}->prepare($q);
-		#Logger::logger("getting track info for track $trackid", $this->{-device}.' player');
+		#Logger::logger("getting track info for track $trackid");
 		$sth->execute($trackid);
 		$track = $sth->fetchrow_hashref;
 		$sth->finish;

@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-# $Header: /home/cvs/thundaural/server/server.pl,v 1.5 2004/01/08 09:18:26 jukebox Exp $
+# $Header: /home/cvs/thundaural/server/server.pl,v 1.6 2004/01/09 07:07:35 jukebox Exp $
 
 use strict;
 use warnings;
@@ -26,6 +26,7 @@ use ServerCommands;
 use Logger;
 use Player;
 use Reader;
+use Statistics;
 
 use DBI;
 
@@ -64,6 +65,9 @@ $dbh->disconnect();
 
 my $storagedir = Settings::storagedir();
 my $dblock : shared = 0xfef1f0fa;
+
+my $stats = new Statistics(-dbfile=>$dbfile, -ref_dblock=>\$dblock);
+my $statsthr = threads->new(sub { eval { $stats->run(); }; Logger::logger("statistics thread no longer running"); } );
 
 my $playerthrs = {};
 {
@@ -257,10 +261,12 @@ sub server {
 	foreach my $dv (keys %$playerthrs) {
 		$playerthrs->{$dv}->{-object}->cmdqueue()->enqueue('abort');
 		$playerthrs->{$dv}->{-object}->cmdqueue()->enqueue(undef); # get the player thread to exit
+		threads->yield();
 	}
 	foreach my $dv (keys %$readerthrs) {
 		$readerthrs->{$dv}->{-object}->cmdqueue()->enqueue('abort');
 		$readerthrs->{$dv}->{-object}->cmdqueue()->enqueue(undef); # get the reader thread to exit
+		threads->yield();
 	}
 	foreach my $fh (keys %$connections) {
 		Logger::logger("shutdown, closing ".$connections->{$fh}->{name});
@@ -269,5 +275,6 @@ sub server {
 	close($listener);
 
 	sleep 2; # wait for other threads to exit
+	threads->yield();
 }
 

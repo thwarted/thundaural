@@ -1,7 +1,7 @@
 
 package Albums;
 
-# $Header: /home/cvs/thundaural/client/Albums.pm,v 1.3 2004/01/03 07:17:45 jukebox Exp $
+# $Header: /home/cvs/thundaural/client/Albums.pm,v 1.5 2004/01/09 07:21:03 jukebox Exp $
 
 use strict;
 use warnings;
@@ -38,7 +38,8 @@ sub _populate {
 		}
 		$this->{sorted_performer} = $this->_sort_by('performer', 'name');
 	} else {
-		die("change this to fail gracefully");
+		$this->{sorted_performer} = [];
+		Logger::logger("failed to populate, defaulting to empty list");
 	}
 	$this->{nextupdate} = time() + 20;
 }
@@ -65,10 +66,15 @@ sub list {
 	my $limit = shift;
 
 	$this->_populate();
+	if (! scalar(keys(%{$this->{albums}})) ) {
+		return [];
+	}
 	# this is some goofy reference trickery here
 	# is there a way to do a slice of an array ref through a hash?
 	my @x = @{$this->{sorted_performer}};
-	@x = @x[$offset .. $offset+$limit-1];
+	if ((scalar @x) > $limit) {
+		@x = @x[$offset .. $offset+$limit-1];
+	}
 	return [ @x ];
 }
 
@@ -140,8 +146,8 @@ sub trackids {
 		}
 		return $ret;
 	} else {
-		warn("should fail gracefully");
 	}
+	Logger::logger("failed to get tracks for $albumid");
 	return [];
 }
 

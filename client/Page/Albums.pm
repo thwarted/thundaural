@@ -24,6 +24,8 @@ use Button;
 
 our @ISA = qw( Page );
 
+my $transparent = new SDL::Color(-r=>1, -g=>4, -b=>8);
+
 sub new {
 	my $proto = shift;
 	my %o = @_;
@@ -195,38 +197,79 @@ sub now_viewing {
 sub update_albums_widgets {
 	my $this = shift;
 
-	return if ($this->{-lastalbumoffset} == $this->{-albumoffset});
-	my @pos = @{$this->{-positions}};
-	my $perpage = $this->{-albumsperpage};
-	my @widgets = $this->widgets();
-	foreach my $al (@widgets) {
-		$this->delete_widget($al) if ($al =~ m/^00-album\d+/);
-	}
+	my $albumcount = $this->{-albums}->count();
+	if ($albumcount) {
+		return if ($this->{-lastalbumoffset} == $this->{-albumoffset});
+		my @pos = @{$this->{-positions}};
+		my $perpage = $this->{-albumsperpage};
+		my @widgets = $this->widgets();
+		foreach my $al (@widgets) {
+			$this->delete_widget($al) if ($al =~ m/^00-album\d+/);
+		}
 
-	my $albums = $this->{-albums}->list($this->{-albumoffset}, $perpage);
-	foreach my $alid (@$albums) {
-		my($x, $y) = @{shift(@pos)};
-		#Logger::logger("creating album $alid at $x,$y");
+		my $albums = $this->{-albums}->list($this->{-albumoffset}, $perpage);
+		foreach my $alid (@$albums) {
+			my($x, $y) = @{shift(@pos)};
+			#Logger::logger("creating album $alid at $x,$y");
+			my $drect = new SDL::Rect(-width=>275, -height=>275, -x=>$x, -y=>$y);
+			my $albumbutton = new Button(-name=>"00-album$alid",
+							-canvas=>$this->{-canvas},
+							-mask=>$drect,
+							#-nosync=>1
+							);
+			$albumbutton->surface(0, $this->_make_album_cover($alid));
+			$albumbutton->frame(0);
+			$albumbutton->on_interior_event(SDL::SDL_MOUSEBUTTONDOWN, sub { 
+					Logger::logger("selected album $alid"); 
+					$this->{-appstate}->{albumid} = $alid;
+					$this->{-appstate}->{current_page} = 'tracks'; 
+				} );
+			$this->add_widget($albumbutton);
+		}
+		$this->{-lastalbumoffset} = $this->{-albumoffset};
+		if ($albumcount <= $this->{-albumsperpage}) {
+			$this->widget('99-back')->hide(1);
+			$this->widget('99-next')->hide(1);
+			$this->widget('99-slider')->hide(1);
+		} else {
+			$this->widget('99-back')->hide($this->{-albumoffset} == 0 ? 1 : 0);
+			$this->widget('99-back')->frame('raised');
+			$this->widget('99-next')->hide($this->{-albumoffset} >= ($this->{-albums}->count() - $perpage) ? 1 : 0);
+			$this->widget('99-next')->frame('raised');
+		}
+	} else {
+		my @pos = @{$this->{-positions}};
+		my($x, $y) = @{$pos[3]}; # I happen to know where this one is located
+		Logger::logger("displaying at $x $y");
 		my $drect = new SDL::Rect(-width=>275, -height=>275, -x=>$x, -y=>$y);
-		my $albumbutton = new Button(-name=>"00-album$alid",
+		my $albumbutton = new Button(-name=>"00-album00",
 						-canvas=>$this->{-canvas},
 						-mask=>$drect,
-						#-nosync=>1
 						);
-		$albumbutton->surface(0, $this->_make_album_cover($alid));
+		$albumbutton->surface(0, $this->_make_empty_notice());
 		$albumbutton->frame(0);
-		$albumbutton->on_interior_event(SDL::SDL_MOUSEBUTTONDOWN, sub { 
-				Logger::logger("selected album $alid"); 
-				$this->{-appstate}->{albumid} = $alid;
-				$this->{-appstate}->{current_page} = 'tracks'; 
-			} );
 		$this->add_widget($albumbutton);
+		$this->widget('99-back')->hide(1);
+		$this->widget('99-next')->hide(1);
+		$this->widget('99-slider')->hide(1);
 	}
-	$this->{-lastalbumoffset} = $this->{-albumoffset};
-	$this->widget('99-back')->hide($this->{-albumoffset} == 0 ? 1 : 0);
-	$this->widget('99-back')->frame('raised');
-	$this->widget('99-next')->hide($this->{-albumoffset} >= ($this->{-albums}->count() - $perpage) ? 1 : 0);
-	$this->widget('99-next')->frame('raised');
+}
+
+sub _make_empty_notice {
+	my $this = shift;
+
+	my $x = new SDL::Surface(-width=>275, -height=>275);
+	$x->display_format();
+	$x->set_color_key(SDL::SDL_SRCCOLORKEY, $transparent);
+	$x->fill(0, $transparent);
+	my $g = 0;
+	$this->{-font}->print($x, 0, $g, "No Albums found!");
+	$g += $this->{-font}->height();
+	$this->{-font}->print($x, 0, $g, "Use the rip functionality");
+	$g += $this->{-font}->height();
+	$this->{-font}->print($x, 0, $g, "to add albums.");
+
+	return $x;
 }
 
 sub _make_album_cover($) {

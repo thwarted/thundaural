@@ -15,7 +15,7 @@ use Logger;
 
 my $BIN_DF = '/bin/df';
 
-# $Header: /home/cvs/thundaural/server/ServerCommands.pm,v 1.7 2004/01/04 09:52:36 jukebox Exp $
+# $Header: /home/cvs/thundaural/server/ServerCommands.pm,v 1.8 2004/01/09 07:06:47 jukebox Exp $
 
 my @cmds = sort qw/pause skip tracks queued devices play albums quit help noop volume status who name rip abort stats/;
 
@@ -529,21 +529,6 @@ sub cmd_track {
 			" popularity rank last-played last-queued times-played times-skipped", [@r]);
 }
 
-sub cmd_rankupdate {
-	my $this = shift;
-	my $input = shift;
-
-	if ($input =~ m/^help/) {
-		return (200, "200 rankupdate - update the play rankings for all tracks\n");
-	}
-
-	my $start = time();
-	$this->_update_track_ranks();
-	my $end = time();
-	return (200, "200 done in ".($end-$start)." seconds\n");
-}
-
-
 sub cmd_tracks {
 	my $this = shift;
 	my $input = shift;
@@ -824,46 +809,6 @@ sub _format_list {
 	my $c = scalar @$lines;
 	my $headerline = "$rescode count $c ($format)\n";
 	return ($rescode, [$headerline, @$lines, ".\n"]);
-}
-
-sub _update_track_ranks {
-	my $this = shift;
-
-	# get total of how many tracks have been played
-	my $q = "select count(1) from playhistory where action = ?";
-	my $sth = $this->{-dbh}->prepare($q);
-	$sth->execute('played');
-	my($t) = $sth->fetchrow_array();
-	$sth->finish;
-	$t = 0 if (!$t);
-	$t = sprintf('%.2f', $t);
-
-	my $viewname = "ranks$$";
-	$this->{-dbh}->do("create temporary table $viewname as select count(1) as cnt, trackid from playhistory where action = 'played' group by 2");
-	$q = "select cnt, round(cnt/$t, 7), trackid from $viewname order by 1 desc";
-	Logger::logger($q);
-	$sth = $this->{-dbh}->prepare($q);
-	$sth->execute();
-	my @ret = ();
-	my $rank = 0;
-	eval {
-		lock(${$this->{-dblock}});
-		$this->{-dbh}->begin_work();
-		my $lastpop = -1;
-		while(my($cnt, $pop, $trackid) = $sth->fetchrow_array()) {
-			$rank++ if ($pop != $lastpop);
-			my $q = "update tracks set popularity = $pop, rank = $rank where trackid = $trackid";
-			$this->{-dbh}->do($q);
-			$lastpop = $pop;
-		}
-	};
-	if ($@) {
-		$this->{-dbh}->rollback();
-	} else {
-		$this->{-dbh}->commit();
-	}
-	$sth->finish;
-	$this->{-dbh}->do("drop table $viewname");
 }
 
 1;

@@ -1,7 +1,7 @@
 
 package Album;
 
-# $Header: /home/cvs/thundaural/client/Album.pm,v 1.2 2003/12/27 10:44:04 jukebox Exp $
+# $Header: /home/cvs/thundaural/client/Album.pm,v 1.3 2004/01/09 06:01:47 jukebox Exp $
 
 use strict;
 use Albums;
@@ -60,11 +60,14 @@ sub tracks {
 	$this->_populate() if (!$this->{-info});
 
 	my $trks = $this->{iCon}->getlist("tracks", $this->{-albumid});
-	my $ret = [];
-	foreach my $t (@$trks) {
-		push(@$ret, new Track(-trackref=>$t->{trackref}, -data=>$t));
+	if (ref($trks) eq 'ARRAY') {
+		my $ret = [];
+		foreach my $t (@$trks) {
+			push(@$ret, new Track(-trackref=>$t->{trackref}, -data=>$t));
+		}
+		return $ret;
 	}
-	return $ret;
+	return [];
 }
 
 sub trackids {

@@ -55,6 +55,14 @@ sub _ensureconnect {
 						$this->{server}, $this->{port}));
 				}
 				sleep 3;
+				{ # this should really be reworked to use common code that exists in package main
+					my $event = new SDL::Event;
+					while ($event->poll()) {
+						my $type = $event->type();      # get event type
+						if ($type == SDL::SDL_QUIT) { Logger::logger("request quit"); exit; }
+						if ($type == SDL::SDL_KEYDOWN) { if ($event->key_name() eq 'q') { Logger::logger("exiting"); exit; } }
+					}
+				}
 			}
 			my $h = $this->{ihn};
 			print $h "name jbsdl.$$\n";
@@ -95,8 +103,9 @@ sub _populate_status {
 			$this->{queuedonlastupdate} = 0;
 		}
 		$this->{lasttrackref} = $ltr;
-	} else {
-		warn("unable to get status, result was $st");
+	} else {	
+		Logger::logger("unable to get status, result was $st");
+		$this->{status} = {};
 	}
 }
 
@@ -115,7 +124,8 @@ sub _populate_queuedon {
 		}
 		$this->{queuedonlastupdate} = time();
 	} else {
-		warn("unable to get queued list, result was $qo");
+		Logger::logger("unable to get queued track list, result was $qo");
+		$this->{queuedon} = {};
 	}
 }
 
@@ -134,7 +144,8 @@ sub _populate_devices {
 		}
 		$this->{deviceslastupdate} = time();
 	} else {
-		warn("unable to get device list, result was $d");
+		Logger::logger("unable to get device list from server, result was $d");
+		$this->{devices} = {};
 	}
 }
 
@@ -143,7 +154,11 @@ sub tracks {
 	my $alir = shift;
 
 	return [] if (!$alir);
-	return $this->_do_cmd('tracks', $alir);
+	my $to = $this->_do_cmd('tracks', $alir);
+	if (ref($to) eq 'ARRAY') {
+		return $to;
+	}
+	return [];
 }
 
 sub devices {
@@ -371,6 +386,8 @@ sub _do_cmd {
 				push(@results, $rl);
 			}
 			return \@results;
+		} else {
+			return $rescode;
 		}
 	}
 	return $rescode;

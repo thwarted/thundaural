@@ -2,7 +2,7 @@
 
 package Reader;
 
-# $Header: /home/cvs/thundaural/server/Reader.pm,v 1.2 2004/01/01 23:28:18 jukebox Exp $
+# $Header: /home/cvs/thundaural/server/Reader.pm,v 1.3 2004/01/09 07:07:00 jukebox Exp $
 
 use strict;
 use warnings;
@@ -12,6 +12,8 @@ use threads::shared;
 use Thread::Queue;
 
 use File::Basename;
+
+use DBI;
 
 use Settings;
 use Logger;
@@ -58,7 +60,7 @@ sub _dbconnect {
 	my $dbfile = $this->{-dbfile};
 	if ($dbfile) {
 		$this->{-dbh} = DBI->connect("dbi:SQLite:dbname=$dbfile","","");
-		Logger::logger("dbh is ".$this->{-dbh}, $this->{-device}." reader");
+		Logger::logger("dbh is ".$this->{-dbh});
 	}
 }
 
@@ -111,7 +113,7 @@ sub run {
 			if ($cmd =~ m/^abort$/) {
 				last RUN;
 			}
-			Logger::logger("reader got \"$cmd\", ignoring", $this->{-device},' reader');
+			Logger::logger("reader got \"$cmd\", ignoring");
 		}
 		last RUN if (!$main::run);
 
@@ -138,13 +140,13 @@ sub run {
 			${$this->{-state}} = "idle";
 			next RUN;
 		}
-		Logger::logger("started \"".join(' ', @ppargs)."\"", $this->{-device}.' reader');
+		Logger::logger("started \"".join(' ', @ppargs)."\"");
 		my $readthr = threads->new(sub { $this->_read_status($plread, $rpid); } );
 
 		TILLFINISHED:
 		while(my $cmd = $this->{-cmdqueue}->dequeue()) {
 			if ($cmd =~ m/^abort/) {
-				Logger::logger("got abort, killing $rpid", $this->{-device}.' reader');
+				Logger::logger("got abort, killing $rpid");
 				kill 15, $rpid;
 				${$this->{-track}} = "user aborted $rpid";
 				${$this->{-state}} = 'idle';
@@ -154,12 +156,12 @@ sub run {
 		}
 		waitpid $rpid, 0;
 		my $success = $readthr->join;
-		Logger::logger("reader thread returned $success", $this->{-device}.' reader');
+		Logger::logger("reader thread returned $success");
 
 		# devicename state volume trackref performer name genre length trackid started current percentage
 	}
 
-	Logger::logger("exiting", $this->{-device}.' reader');
+	Logger::logger($this->{-device}." exiting");
 }
 
 sub _read_status {
@@ -184,7 +186,7 @@ sub _read_status {
 				my $vol = (shift @x) || '-';
 				my $trkrf = (shift @x) || '-';
 				if ((int($pct) % 10) == 0 || $corrections != 0) {
-					Logger::logger("track $trkrf, $vol, $pct%, $corrections corrections", $this->{-device}.' output');
+					Logger::logger("track $trkrf, $vol, $pct%, $corrections corrections");
 				}
 			}
 		}
