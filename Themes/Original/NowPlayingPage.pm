@@ -42,14 +42,13 @@ sub widget_initialize {
     my $ifarea = new SDL::Rect(-width=>1024-10-10-300-10, -height=>768-105-15, -x=>10+300+10, -y=>126); # 105 + 16
     $this->add_widget(new Themes::Original::NowPlayingInfo(name=>'nowplayinginfo', area=>$ifarea));
 
-    my $sparea = new SDL::Rect(-width=>400, -height=>16, -x=>10+300+10, -y=>105);
+    my $sparea = new SDL::Rect(-width=>600, -height=>16, -x=>10+300+10, -y=>105);
     my $sp = new Widget::ProgressBar(name=>'songprogress', area=>$sparea, bgcolor=>$bgcolor, fgcolor=>$fgcolor, font=>$f);
     $sp->type('bar');
     $sp->orientation('h');
     $this->add_widget($sp);
 
     my $vsarea = new SDL::Rect(-width=>40, -height=>290, -x=>10, -y=>440);
-
     my $vs = new Widget::ProgressBar(name=>'volumeselect', area=>$vsarea, bgcolor=>$bgcolor, fgcolor=>$fgcolor);
     $vs->set_onClick( sub { my $this = shift; my %o = @_; $this->percent_full($o{percentage}); } );
     $vs->type('bar');
