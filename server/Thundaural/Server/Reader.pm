@@ -17,6 +17,8 @@ use Thread::Queue;
 
 use File::Basename;
 
+use Data::Dumper;
+
 use DBI;
 
 use Thundaural::Server::Settings;
@@ -182,15 +184,23 @@ sub _read_status {
 		if ($l =~ m/^$devicefile/) {
 			next if (${$this->{-track}} =~ m/^user aborted $rpid$/);
 			my @x = split(/\t/, $l);
-			shift @x; # remove leading device name
-			${$this->{-state}} = shift @x;
+            shift @x; # remove leading device name
+            my($state, $vol, $trkrf, undef, undef, undef, $pct, $corrections) = @x;
+			${$this->{-state}} = $state;
+            shift @x; # remove state;
 			${$this->{-track}} = join("\t", @x);
 			if (($c++ % 45) == 0) {
-				my $pct = (pop @x) || 0;
-				my $corrections = (pop @x) || '0';
-				my $vol = (shift @x) || '-';
-				my $trkrf = (shift @x) || '-';
-				if ((int($pct) % 10) == 0 || $corrections != 0) {
+                $pct ||= 0;
+                $corrections ||= 0;
+                $vol ||= '-';
+                $trkrf ||= '-';
+				#my $pct = (pop @x) || 0;
+				#my $corrections = (pop @x) || '0';
+				#my $vol = (shift @x) || '-';
+				#my $trkrf = (shift @x) || '-';
+                logger("pct = $pct");
+                logger("corrections = $corrections");
+				if ((int($pct) % 10) == 0 || int($corrections) != 0) {
 					logger("track $trkrf, $vol, $pct%, $corrections corrections");
 				}
 			}

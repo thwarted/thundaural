@@ -14,6 +14,8 @@ BEGIN {
     # invoke a shell in the caller to do redirection
     select STDERR; $| = 1; select STDOUT; $| = 1; 
     open(STDERR, '>&=STDOUT');
+
+    setpgrp(0, $$) or die("setpgrp failed: $!\n");
 }
 
 $SIG{__WARN__} = sub { cluck(@_); };
@@ -743,10 +745,7 @@ sub find_audio_encoder {
 }
 
 sub abortus {
-    my $ripchild = &pid_using_device($sx->{cddevice});
-    if (defined($ripchild) && $ripchild) {
-        kill 15, $ripchild;
-    }
+    kill 15, -($$); # kill the process group
     exit;
 };
 
@@ -776,7 +775,7 @@ sub get_sort_dir {
 }
 
 sub cleanup {
-    &dumpstatus("cleanup");
+    &dumpstatus('busy', 'cleanup');
     my $pattern = Thundaural::Util::tmpnameprefix($sx->{storagedir}, $sx->{cddevice}).'*';
     my @files = bsd_glob($pattern);
     foreach my $f (@files) {
