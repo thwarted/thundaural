@@ -16,6 +16,8 @@ changes from version 2.0 to 2.1
   works for you.  The default of 8 should be safe for most combinations of
   discs and drives.
 
+- fixed warnings output by taripdisc when used with the --infofile option 
+  and there is no cover art images found
 
 
 changes from version 1.7 to 2.0
