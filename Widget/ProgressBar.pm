@@ -152,7 +152,7 @@ sub draw {
     my %o = @_;
     my $ticks = $o{ticks};
 
-    if (my $sd = $this->should_draw(@_)) {
+    if ($this->should_draw(@_)) {
         my $area = $this->area();
         my $o = $this->{_pb};
         $o->{surf}->fill(0, $o->{bgcolor});
