@@ -1,5 +1,12 @@
 #!/usr/bin/perl
 
+BEGIN {
+    my($dir) = $0 =~ m/^(.+)\/[^\/]+$/;
+    if ($dir) {
+        eval "use lib \"$dir\"";
+    }
+}
+
 use strict;
 use warnings;
 

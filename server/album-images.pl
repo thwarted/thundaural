@@ -1,6 +1,11 @@
 #!/usr/bin/perl
 
-# $Header: /home/cvs/thundaural/server/album-images.pl,v 1.2 2004/07/16 06:00:14 jukebox Exp $
+BEGIN {
+    my($dir) = $0 =~ m/^(.+)\/[^\/]+$/;
+    if ($dir) {
+        eval "use lib \"$dir\"";
+    }
+}
 
 use strict;
 use warnings;
