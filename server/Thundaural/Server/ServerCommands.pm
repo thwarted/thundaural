@@ -857,7 +857,7 @@ sub cmd_queued {
     if ($devicename) {
         $q .= " and devicename = ?";
     }
-    $q .= " order by requestedat, devicename";
+    $q .= " order by requestedat, playhistoryid, devicename";
     lock(${$this->{-dblock}});
     my $sth = $this->{-dbh}->prepare($q);
     $sth->execute('queued', @a);

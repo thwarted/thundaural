@@ -269,7 +269,7 @@ sub find_another_song {
 	my $playtrack;
 	{
 		lock(${$this->{-dblock}});
-		my $q = "select * from playhistory where devicename = ? and action = ? order by requestedat limit 1";
+		my $q = "select * from playhistory where devicename = ? and action = ? order by requestedat, playhistoryid limit 1";
 		my $sth = $this->{-dbh}->prepare($q);
 		$sth->execute('main', 'queued');
 		$playtrack = $sth->fetchrow_hashref();
