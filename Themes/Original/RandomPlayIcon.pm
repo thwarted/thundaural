@@ -27,7 +27,7 @@ sub widget_initialize {
     $this->area($area);
 
     $this->set_frame(file=>'images/randomize.png', resize=>1, frame=>0);
-    $this->set_depressed_frame(file=>'images/button-back-raised.gif', resize=>1, frame=>0);
+    #$this->set_depressed_frame(file=>'images/button-back-raised.gif', resize=>1, frame=>0);
 
     $this->SUPER::widget_initialize();
 }

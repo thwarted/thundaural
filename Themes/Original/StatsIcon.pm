@@ -27,7 +27,7 @@ sub widget_initialize {
     $this->area($area);
 
     $this->add_frame(file=>'images/goto-stats.png', resize=>1);
-    $this->add_depressed_frame(file=>'images/volume-max.png', resize=>1);
+    #$this->add_depressed_frame(file=>'images/volume-max.png', resize=>1);
     #$this->add_frame(file=>'images/goto-albums.png', resize=>1);
 
     $this->SUPER::widget_initialize();
