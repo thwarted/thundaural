@@ -178,9 +178,10 @@ sub draw_info {
             $just = 0;
             $xpos = $area->width() / 2;
         }
-        $this->{surface}->fill(0, $this->{bgcolor});
+        my $surf = $this->surface();
+        $this->container()->draw_background(canvas=>$surf, dest=>0, source=>$area);
         my @wrappedlines = $this->{font}->wrap(rect=>$area, lines=>\@lines);
-        $this->{font}->print_lines_justified(just=>$just, surf=>$this->{surface}, x=>$xpos, y=>0, lines=>\@wrappedlines, maxwidth=>$area->width()-10, wrap=>1);
+        $this->{font}->print_lines_justified(just=>$just, surf=>$surf, x=>$xpos, y=>0, lines=>\@wrappedlines, maxwidth=>$area->width()-10, wrap=>1);
         $this->{lastlines} = $ll;
     }
 }

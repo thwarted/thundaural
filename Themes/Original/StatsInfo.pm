@@ -31,8 +31,8 @@ sub widget_initialize {
 
     $this->{bgcolor} = new SDL::Color(-r=>160, -b=>160, -g=>160);
     $this->{fgcolor} = new SDL::Color(-r=>0, -b=>0, -g=>0);
-    #my $s = new SDL::Surface(-width=>$area->width(), -height=>$area->height(), -depth=>32);
-    #$this->surface($s);
+    my $s = new SDL::Surface(-width=>$area->width(), -height=>$area->height(), -depth=>32);
+    $this->surface($s);
 
     $this->{font} = new SDL::TTFont(-name=>"./fonts/Vera.ttf", -size=>20, -bg=>$this->{bgcolor}, -fg=>$this->{fgcolor});
 
@@ -101,12 +101,12 @@ sub draw_info {
     push(@lines, sprintf("Server software up since %s", strftime('%a %b %e %H:%M:%S %Y', localtime($supsince))));
     push(@lines, sprintf("Client connected since %s", strftime('%a %b %e %H:%M:%S %Y', localtime($cupsince))));
 
-    print "\n".join("\n", @lines)."\n";
+    #print "\n".join("\n", @lines)."\n";
 
     my $area = $this->area();
-    my $s = new SDL::Surface(-width=>$area->width(), -height=>$area->height(), -depth=>32);
-    $this->{font}->print_lines_justified(just=>-1, surf=>$s, x=>10, y=>10, lines=>\@lines);
-    $this->surface($s);
+    my $surf = $this->surface();
+    $this->container()->draw_background(canvas=>$surf, dest=>0, source=>$area);
+    $this->{font}->print_lines_justified(just=>-1, surf=>$surf, x=>10, y=>10, lines=>\@lines);
 
     {
         my $c = $this->container();

@@ -64,9 +64,9 @@ sub update {
         # finally detected the change, so don't query so often now
         $this->update_every(10000);
         my $area = $this->area();
-        my $s = new SDL::Surface(-width=>$area->width(), -height=>$area->height(), -depth=>32);
-        $this->{font}->print_lines_justified(just=>0, surf=>$s, x=>$this->area()->width()/2, y=>10, lines=>\@lines);
-        $this->surface($s);
+        my $surf = $this->surface();
+        $this->container()->draw_background(canvas=>$surf, dest=>0, source=>$area);
+        $this->{font}->print_lines_justified(just=>0, surf=>$surf, x=>$this->area()->width()/2, y=>10, lines=>\@lines);
         $this->{lastlines} = $x;
         return 1;
     }

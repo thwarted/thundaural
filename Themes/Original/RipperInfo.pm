@@ -97,8 +97,7 @@ sub draw_info {
     } else {
         $this->container()->get_widget('ripaction')->update_face('ripping');
         if (defined($s->{trackref}) && ($s->{trackref} =~ m/\//)) {
-            my(undef, $ct) = $s->{trackref} =~ m/(\d+)\/(\d+)/;
-            my $tt = $s->{trackid}; # total tracks is here
+            my($ct, $tt) = $s->{trackref} =~ m/(\d+)\/(\d+)/;
             push(@lines, sprintf('Ripping track %d of %s %s', $ct, $tt, $s->{volume}));
             push(@lines, ' ');
             push(@lines, sprintf('%s - %s', $s->{performer}, $s->{name}));
@@ -123,7 +122,7 @@ sub draw_info {
 
     my $area = $this->area();
     my $surf = $this->surface();
-    $surf->fill(0, $this->{bgcolor});
+    $this->container()->draw_background(canvas=>$surf, dest=>0, source=>$area);
     $this->{font}->print_lines_justified(just=>0, surf=>$surf, x=>$area->width()/2, y=>0, lines=>\@lines, wrap=>1);
 
     if (my $ac = $this->container()->get_widget('AlbumCover')) {

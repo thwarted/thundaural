@@ -28,10 +28,13 @@ sub widget_initialize {
     my $area = $this->area();
     $this->update_every(1000);
 
-    $this->{bgcolor} = new SDL::Color(-r=>160, -b=>160, -g=>160);
-    $this->{fgcolor} = new SDL::Color(-r=>0, -b=>0, -g=>0);
+    $this->{bgcolor} = new SDL::Color(-r=>170, -g=>170, -b=>170);
+    $this->{fgcolor} = new SDL::Color(-r=>0, -g=>0, -b=>0);
 
-    $this->{font} = new SDL::TTFont(-name=>"./fonts/Vera.ttf", -size=>49, -bg=>$this->{bgcolor}, -fg=>$this->{fgcolor});
+    my $fontsize = 49;
+    $this->{font} = new SDL::TTFont(-name=>"./fonts/Vera.ttf", -size=>$fontsize, -bg=>$this->{bgcolor}, -fg=>$this->{fgcolor});
+    $this->{surface} = new SDL::Surface(-width=>$area->width(), -height=>$area->height(), -depth=>32);
+    $this->surface($this->{surface});
 
     $this->{lastupdate} = 0;
     $this->{lastlines} = '';
@@ -52,10 +55,8 @@ sub update {
     my $x = freeze(\@lines);
     if ($force || $x ne $this->{lastlines}) {
         my $area = $this->area();
-        my $s = new SDL::Surface(-width=>$area->width(), -height=>$area->height(), -depth=>32);
-        $s->fill(0, $this->{bgcolor});
-        $this->{font}->print_lines_justified(just=>-1, surf=>$s, x=>0, y=>0, lines=>\@lines, maxwidth=>$area->width()-10);
-        $this->surface($s);
+        $this->container()->draw_background(canvas=>$this->{surface}, dest=>0, source=>$this->area());
+        $this->{font}->print_lines_justified(just=>-1, surf=>$this->{surface}, x=>0, y=>0, lines=>\@lines, maxwidth=>$area->width()-10);
         $this->{lastlines} = $x;
         return 1;
     }
