@@ -95,32 +95,42 @@ sub print_lines_justified {
     my %o = @_;
     my $justification = $o{justification} || $o{just};
     my $surface = $o{surface} || $o{surf};
-    my $x = $o{x};
-    my $y = $o{y};
+    my $x = int($o{x});
+    my $y = int($o{y});
     my $maxwidth = $o{maxwidth};
+    my $trunc = $o{'truncate'};
     my @lines;
     if (ref($o{lines}) eq 'ARRAY') {
         @lines = @{$o{lines}};
+    } else {
+        confess("lines argument must be array ref");
+        return $y;
     }
+
+    $trunc = 0 if (!$maxwidth);
 
     # specify $x relative to the justification
     #   0 ------------- 50 ------------ 100
     #   (Left -1)   (Center 0)   (Right +1)
 
-    $x = int($x);
-    $y = int($y);
-
     my $height = $this->height();
     my $newx = $x;
     my $maxx = $surface->width();
+    my $w;
     foreach my $l (@lines) {
         $l =~ s/\t/       /g;
         if ($l =~ m/^\s*$/) { $l = ' '; };
+        if ($l =~ m/\s/) {
+            # only try to truncate if there is whitespace to divide the string by
+            while ($trunc && $maxwidth && ($w = $this->width($l)) > $maxwidth) {
+                $l =~ s/\s+\S+\s*$//;
+                $l .= '...';
+            }
+        }
+        $w = $this->width($l);
         if ($justification == 0) {
-            my $w = $this->width($l);
             $newx = $x - int($w / 2);
         } elsif ($justification == 1) {
-            my $w = $this->width($l);
             $newx = $x - $w;
         }
         # else --- nothing to do for left justification (-1)
