@@ -47,7 +47,7 @@ my %options = (
     'storagedir=s'=>\($_vars->{storagedir}),
     'homedir=s'=>\($_vars->{homedir}),
     'dbfile=s'=>\($_vars->{dbfile}),
-    'createdb'=>\($_vars->{dbsetup}),
+    'createdb'=>\($_vars->{createdb}),
     'pausebetween=i'=>\($_vars->{pausebetween}),
     'listenport=i'=>\($_vars->{listenport}),
     'listenhost=s'=>\($_vars->{listenhost}),
