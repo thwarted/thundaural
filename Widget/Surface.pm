@@ -69,6 +69,12 @@ sub draw {
         }
     }
     if ($this->{_s}->{lastupdate} == -1) {
+        # is this really needed?   if there isn't a surface, we can't attempt to draw it
+        # well, the blitter in main won't attempt to draw a false surface
+        if (!ref($this->{_s}->{surface})) {
+            $o{force} = 1;
+            $this->draw_info(%o);
+        }
         $this->{_s}->{lastupdate} = $o{ticks};
         $this->erase();
         return $this->request_blit(surface=>$this->{_s}->{surface}, area=>$this->area(), sync=>1, name=>$this->name());
