@@ -25,7 +25,7 @@ For each album, the process is three steps:
           the scope of this document and this utility.
      this is, most likely, the most involved step.
 
-  2. use the server/personal-archive-load.pl script to generate a
+  2. use the tapersonalarchive script to generate a
      Thundaural-specific metadata file for each album.  In most cases, this is
      simply a matter of giving this script the directory that contains the
      tracks.  It will generate a .pv file.
@@ -43,33 +43,25 @@ previously converted the files from .wav to Ogg Vorbis before starting this):
 Kong in Concert - 01 - Israfel - Godiva in the Desert (Theme).ogg
 Kong in Concert - 02 - Hemophiliac - Swing, Monkey, Swing (Simian Segue).ogg
 Kong in Concert - 03 - JigginJonT - West Coast DK Island (DK Island Swing).ogg
-Kong in Concert - 04 - Unknown - Rest and (Re)spite on a Soft Summer Night
-(Cranky's Theme).ogg
-Kong in Concert - 05 - Adhesive_Boy - Cry of the Chasmal Critter Chain (Cave
-Dweller Concert).ogg
+Kong in Concert - 04 - Unknown - Rest and (Re)spite on a Soft Summer Night (Cranky's Theme).ogg
+Kong in Concert - 05 - Adhesive_Boy - Cry of the Chasmal Critter Chain (Cave Dweller Concert).ogg
 Kong in Concert - 06 - Icy Guy - One Zero One (Bonus Room Blitz).ogg
 Kong in Concert - 07 - Vigilante - Beneath the Surface (Aquatic Ambiance).ogg
 Kong in Concert - 08 - Vigilante - Funky Monkey Love (Candy's Love Song).ogg
-Kong in Concert - 09 - Red Omen, Protricity - Boiling Point (Bad Boss
-Boogie).ogg
-Kong in Concert - 10 - Protricity - Mine Cart Misadventure (Mine Cart
-Madness).ogg
+Kong in Concert - 09 - Red Omen, Protricity - Boiling Point (Bad Boss Boogie).ogg
+Kong in Concert - 10 - Protricity - Mine Cart Misadventure (Mine Cart Madness).ogg
 Kong in Concert - 11 - Sadorf, Sir NutS - Echoes (Life in the Mines).ogg
-Kong in Concert - 12 - GrayLightning - Idols of Hanuman (Voices of the
-Temple).ogg
+Kong in Concert - 12 - GrayLightning - Idols of Hanuman (Voices of the Temple).ogg
 Kong in Concert - 13 - zircon - Faunaphonic (Forest Frenzy).ogg
 Kong in Concert - 14 - smh - Arboreal Ascent (Treetop Rock).ogg
 Kong in Concert - 15 - bLiNd - Aerofunknamics (Funky's Fugue).ogg
-Kong in Concert - 16 - Aetherius - Clouded Mind and Ringing Ears (Misty
-Menace).ogg
+Kong in Concert - 16 - Aetherius - Clouded Mind and Ringing Ears (Misty Menace).ogg
 Kong in Concert - 17 - Prophecy - Chekan Winter (Northern Hemispheres).ogg
 Kong in Concert - 18 - analoq - dolilop do wop (Ice Cave Chant).ogg
 Kong in Concert - 19 - GrayLightning - Machina Anesthesia (Fear Factory).ogg
 Kong in Concert - 20 - Dhsu - Pirate Prelude (Gang-Plank Galleon Pt 1).ogg
-Kong in Concert - 21 - SnappleMan - Thrash the Plank (Gang-Plank Galleon Pt
-2).ogg
-Kong in Concert - 22 - Protricity - Rare Reminiscence (The Credits
-Concerto).ogg
+Kong in Concert - 21 - SnappleMan - Thrash the Plank (Gang-Plank Galleon Pt 2).ogg
+Kong in Concert - 22 - Protricity - Rare Reminiscence (The Credits Concerto).ogg
 
 Twenty-two tracks.  Note that even though the download of this album is
 arranged in such a way as to suggest it is two physical CDs, I wanted to have
@@ -97,10 +89,10 @@ coverart.png
 So now the directory for this example contains 23 files.  22 tracks and 1
 image.
 
-Now, I run the personal-archive-load.pl script and give it the name of
+Now, I run the tapersonalarchive script and give it the name of
 directory that contains the tracks:
 
-./personal-archive-load.pl --metadata filename \
+./tapersonalarchive --metadata filename \
    ~/kongalbum \
    --pattern '^(.+) - (\d+) - (.+) - (.+).ogg$' \
    --matchorder album,tracknum,artist,title
@@ -150,13 +142,13 @@ If you use the "--metadata tags" option, --pattern and --matchorder isn't
 necessary, as the fields will be attempted to be read from the tags in the
 files.
 
-So the personal-archive-load.pl script created a .pv file in the ~/kongalbum
+So the tapersonalarchive script created a .pv file in the ~/kongalbum
 directory.  You should look over this file to make sure everything checks out.
 You can make changes, but it might be good if you knew perl syntax so the file
 is readable.  If 
 If you had elected to
 
-Note that if you run personal-archive-load.pl multiple times and it finds
+Note that if you run tapersonalarchive multiple times and it finds
 different metadata, you might end up with multiple files because the filename
 contains the artist and album name it found.
 
@@ -168,7 +160,7 @@ invoke it ourselves on the command line:
 ./ripdisc.pl --infofile X.pv --storagedir SD --dbfile DBF
 
 where:
-  X.pv is the file written by the personal-archive-load.pl script
+  X.pv is the file written by the tapersonalarchive script
   SD   is the storage directory (usually /home/storage)
   DBF  is the path to the database file (usually /home/storage/db/data.db)
 
