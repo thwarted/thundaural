@@ -59,7 +59,7 @@ sub show_page {
     my $showpage = shift;
 
     # hide all pages
-    my @pages = qw(AlbumsPage TrackListing RandomPlayPage NowPlayingPage StatsPage);
+    my @pages = qw(AlbumsPage TrackListing RandomPlayPage NowPlayingPage StatsPage RipperPage);
     foreach my $p (@pages) {
         next if ($p eq $showpage);
         my $w = $this->get_widget($p);
