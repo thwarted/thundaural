@@ -1,0 +1,216 @@
+#!/usr/bin/perl
+
+# $Header: /home/cvs/thundaural/client/xscreensaver-interface.pl,v 1.1 2004/03/29 09:02:40 jukebox Exp $
+
+use strict;
+
+use Data::Dumper;
+
+use File::Basename;
+
+use ClientCommands;
+use Track;
+use Albums;
+use Album;
+
+my $datadir = '/tmp/ta-xss-data';
+my $host = 'localhost';
+my $port = '9000';
+
+my @a = @ARGV;
+while (@a) {
+	$a = shift @a;
+	if ($a =~ m/^--host/) { $host = shift @a; }
+	if ($a =~ m/^--port/) { $port = shift @a; }
+	if ($a =~ m/^--datadir/) { $datadir = shift @a; }
+}
+
+mkdir $datadir, 0755;
+
+my $picker = <<"EOF";
+#!/usr/bin/perl
+
+use strict;
+
+my \$printed = 0;
+my \$dir = "$datadir/text";
+if (opendir(XSS, \$dir)) {
+	my \@files = grep { !/^\\./ && -f "\$dir/\$_" } readdir(XSS);
+	closedir(XSS);
+	my \$x = \$files[int(rand(\$#files))];
+	open(XSS, "<\$dir/\$x") || die("\$!\\n");
+	while (my \$line = <XSS>) {
+		if (\$0 =~ m/-n\$/) {
+			chomp \$line;
+			\$line .= ' ';
+		}
+		print \$line;
+	}
+	close(XSS);
+	\$printed = 1;
+}
+if (!\$printed) {
+	print "Thundaural Jukebox";
+}
+
+EOF
+open(PICKER, ">$datadir/picktext") || die("unable to write picker program: $!\n");
+print PICKER $picker;
+close(PICKER);
+chmod 0755, "$datadir/picktext";
+open(PICKER, ">$datadir/picktext-n") || die("unable to write picker program: $!\n");
+print PICKER $picker;
+close(PICKER);
+chmod 0755, "$datadir/picktext-n";
+
+mkdir "$datadir/images", 0755;
+mkdir "$datadir/text", 0755;
+my $instance_tmpdir = "$datadir/cache";
+mkdir $instance_tmpdir, 0700;
+
+END { my $x = $?; if ($instance_tmpdir && -d $instance_tmpdir) { `/bin/rm -rf $instance_tmpdir`; } $? = $x; }
+                                                                                                                                                                                                
+my $iCon = new ClientCommands(-clientlabel=>'TAscreensaver', -host=>$host, -port=>$port);
+my $Albums = new Albums(-server=>$iCon, -tmpdir=>$instance_tmpdir);
+
+my $loops = 1;
+while (1) {
+	my $status = $iCon->playing_on();
+	my $filescopied = 0;
+	foreach my $s (keys %{$status}) {
+		if ($status->{$s}->{'type'} eq 'play') {
+			unlink("$datadir/images/randompick-$s-1.jpg");
+			unlink("$datadir/images/randompick-$s-2.jpg");
+			unlink("$datadir/images/randompick-$s-3.jpg");
+			unlink("$datadir/images/randompick-$s-4.jpg");
+			unlink("$datadir/images/randompick-$s-5.jpg");
+			my $trackref = $status->{$s}->{'trackref'};
+			if (my($albumid, undef) = split(/\//, $trackref)) {
+				$albumid += 0;
+				my $cafile = $Albums->coverartfile($albumid+0);
+				if (-s $cafile) {
+					unlink("$datadir/images/filler.jpg");
+					&copy_file($cafile, "$datadir/images/nowplaying-$s.jpg");
+					$filescopied++;
+				}
+			}
+		}
+	}
+	if (!$filescopied) {
+		# remove any old ones
+		foreach my $s (keys %{$status}) {
+			unlink("$datadir/images/nowplaying-$s.jpg");
+		}
+		# pick a number of covers randomly
+		foreach my $s (keys %{$status}) {
+			if ($status->{$s}->{'type'} eq 'play') {
+				my $r = int(rand($Albums->count() - 4));
+				my $x = $Albums->list($r, 5);
+				my $c = 1;
+				foreach my $alid (@$x) {
+					my $cafile = $Albums->coverartfile($alid);
+					if (-s $cafile) {
+						unlink("$datadir/images/filler.jpg");
+						&copy_file($cafile, "$datadir/images/randompick-$s-$c.jpg");
+						$c++;
+						$filescopied++;
+					}
+				}
+			}
+		}
+	}
+	if (!$filescopied) {
+		&copy_file("./images/fillerimage.jpg", "$datadir/images/filler.jpg");
+	}
+	&write_rankings();
+	sleep 10;
+	&cleanup_cache() if ($loops % 90 == 0);
+	$loops++;
+}
+
+sub write_rankings {
+	my @formats = (
+		# crude subject-verb agreement attempt -- it'll do for now
+		'$name $is ranked $pos with $plays track$ps played',
+		'$plays track$ps played puts $name in $pos place',
+		'With $plays track$ps played, $name $is ranked $pos',
+		'$name $has $plays track$ps played, ranked $pos',
+		'$plays track$ps of $name have been played',
+		'Ranked $pos, $name $has $plays track$ps played',
+	);
+	my $perfranks = $iCon->top_rankings('performers');
+	my $pps = 1;
+	foreach my $l (@$perfranks) {
+		my $f = $formats[int(rand($#formats))];
+		$f =~ s/\$name/$l->{name}/g;
+		$f =~ s/\$plays/$l->{tracksplayed}/g;
+		my $pos = &posstr($pps);
+		$f =~ s/\$pos/$pos/g;
+
+		my $ps = $l->{tracksplayed} == 1 ? '' : 's';
+		$f =~ s/\$ps/$ps/g;
+
+		$f =~ s/s \$is/s are/g;
+		$f =~ s/([^s]) \$is/\1 is/g;
+
+		$f =~ s/s \$has/s have/g;
+		$f =~ s/([^s]) \$has/\1 has/g;
+
+		if (open(T, ">$datadir/text/perfranks-$pps.txt")) {
+			print T "$f\n";
+			close(T);
+		}
+		$pps++;
+	}
+}
+
+sub posstr {
+	my $p = shift;
+
+	if ($p == 1) { return 'first'; }
+	if ($p == 2) { return 'second'; }
+	if ($p == 3) { return 'third'; }
+	if ($p == 4) { return 'fourth'; }
+	if ($p == 5) { return 'fifth'; }
+	if ($p == 6) { return 'sixth'; }
+	if ($p == 7) { return 'seventh'; }
+	if ($p == 8) { return 'eighth'; }
+	if ($p == 9) { return 'ninth'; }
+	if ($p == 10) { return 'tenth'; }
+	if ($p == 11) { return 'eleventh'; }
+	if ($p == 12) { return 'twelveth'; }
+	if ($p == 13) { return 'thirteenth'; }
+	if ($p == 14) { return 'fourteenth'; }
+	if ($p =~ m/1$/) { return $p."st"; }
+	if ($p =~ m/2$/) { return $p."nd"; }
+	if ($p =~ m/3$/) { return $p."rd"; }
+	return $p."th";
+}
+
+sub cleanup_cache {
+	my @del;
+	if (opendir(X, $instance_tmpdir)) {
+		@del = grep { /thundaural-coverartcache/ && -f "$instance_tmpdir/$_" } readdir(X);
+		closedir(X);
+	}
+	if (@del) {
+		foreach my $d (@del) {
+			unlink("$instance_tmpdir/$d");
+		}
+	}
+}
+
+sub copy_file {
+	my $src = shift;
+	my $dst = shift;
+
+	open(S, "<$src");
+	open(D, ">$dst");
+	my $buf;
+	while(sysread(S, $buf, 10240)) {
+		syswrite(D, $buf);
+	}
+	close(D);
+	close(S);
+}
+

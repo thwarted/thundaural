@@ -1,7 +1,7 @@
 
 package Album;
 
-# $Header: /home/cvs/thundaural/client/Album.pm,v 1.4 2004/03/21 03:47:15 jukebox Exp $
+# $Header: /home/cvs/thundaural/client/Album.pm,v 1.6 2004/04/08 05:22:43 jukebox Exp $
 
 use strict;
 use Albums;
@@ -88,82 +88,19 @@ sub coverartfile {
 
 1;
 
-__END__
-#sub count {
-#	my $q = "select count(1) from albums";
-#	my $sth = $main::dbh->prepare($q);
-#	$sth->execute;
-#	my ($c) = $sth->fetchrow_array;
-#	$sth->finish;
-#	return $c;
-#}
-
-sub ranking {
-	my $this = shift;
-
-	my $q;
-	my $table = "rank$$";
-	my $sth;
-
-	$q = "drop table if exists $table";
-	eval {
-		$this->{-dbh}->do($q);
-	};
-
-	$q = 'set @rank := 0';
-	eval {
-		$this->{-dbh}->do($q);
-	};
-	$q = "create temporary table $table as 
-		select count(1) as c, 
-			a.albumid as albumid,
-			\@rank := \@rank + 1 as rank 
-		from albums a left join tracks t 
-			on t.albumid = a.albumid 
-			left join playhistory p 
-			on p.trackid = t.trackid 
-		where p.action = 'played' 
-		group by 2 order by 1 desc";
-	eval {
-		$this->{-dbh}->do($q);
-	};
-
-	$q = "select rank from $table where albumid = ?";
-	my $rank;
-	eval {
-		$sth = $this->{-dbh}->prepare($q);
-		$sth->execute($this->{-albumid});
-		($rank) = $sth->fetchrow_array;
-		$rank = 0 if (!defined($rank));
-		$sth->finish;
-	};
-
-	$q = "select \@rank";
-	my $total;
-	eval {
-		$sth = $this->{-dbh}->prepare($q);
-		$sth->execute;
-		($total) = $sth->fetchrow_array;
-		$sth->finish;
-	};
-
-	$q = "drop table if exists $table";
-	eval {
-		$this->{-dbh}->do($q);
-	};
-
-	return ($rank, $total);
-}
-
-#sub riptime {
-#	my $this = shift;
-#	$this->_populate() if (!$this->{-info});
-#	return $this->{-info}->{riptime};
-#}
-
-#sub cddbid {
-#	my $this = shift;
-#	$this->_populate() if (!$this->{-info});
-#	return $this->{-info}->{cddbid};
-#}
-
+#    Thundaural Jukebox
+#    Copyright (C) 2003-2004  Andrew A. Bakun
+#
+#    This program is free software; you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation; either version 2 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program; if not, write to the Free Software
+#    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA

@@ -6,10 +6,6 @@ use warnings;
 
 use IO::Socket::INET;
 
-use SDL;
-use SDL::Constants;
-use SDL::Event;
-
 use Logger;
 
 my $PROTOCOL_VERSION = '4';
@@ -21,7 +17,7 @@ sub new {
 	my $this = {};
 	bless $this, $class;
 
-	my $server = $opts{-host} || 'jukebox';
+	my $server = $opts{-host} || 'localhost';
 	my $port = $opts{-port} || 9000;
 	$this->{server} = $server;
 	$this->{port} = $port;
@@ -30,6 +26,7 @@ sub new {
 	$this->{lasttrackref} = {};
 	$this->{stats} = {};
 	$this->{random} = {};
+	$this->{clientlabel} = $opts{-clientlabel} || 'unknown';
 
 	$this->{statuslastupdate} = 0;
 	$this->{queuedonlastupdate} = 0;
@@ -39,6 +36,7 @@ sub new {
 
 	$this->{errorfunc} = $opts{-errorfunc};
 	$this->{recoveredfunc} = $opts{-recoveredfunc};
+	$this->{idlefunc} = $opts{-idlefunc};
 
 	$this->_ensureconnect();
 	$this->_clearinput();
@@ -51,6 +49,7 @@ sub _ensureconnect {
 	if (!$this->{ihn} || !$this->{ihn}->connected()) {
 		my $try = 0;
 		eval { $this->{ihn}->shutdown(2); };
+		OPENCONNECTION:
 		while (1) {
 			TRYCONNECT:
 			while (1) {
@@ -69,16 +68,9 @@ sub _ensureconnect {
 					&$f(sprintf("jukebox server (%s:%s)\nis not responding\n\nPlease wait...\n\ntry $try", 
 						$this->{server}, $this->{port}));
 				}
-				my $nowticks = SDL::App::ticks();
-				while(SDL::App::ticks() - $nowticks < 3000) { 
-					# this should really be reworked to use common code that exists in package main
-					my $event = new SDL::Event;
-					while ($event->poll()) {
-						my $type = $event->type();      # get event type
-						if ($type == SDL::SDL_QUIT) { Logger::logger("request quit"); exit; }
-						if ($type == SDL::SDL_KEYDOWN) { if ($event->key_name() eq 'q') { Logger::logger("exiting"); exit; } }
-					}
-					SDL::App::delay(0, 50);
+				if (ref($this->{idlefunc}) eq 'CODE') {
+					my $f = $this->{idlefunc};
+					&$f();
 				}
 			}
 			my $h = $this->{ihn};
@@ -87,12 +79,12 @@ sub _ensureconnect {
 			# wait for the server to respond
 			print $h "noop connectionsync-".time()."\n";
 			$x = <$h>;
-			next TRYCONNECT if (!defined($x));
+			next OPENCONNECTION if (!defined($x));
 
 			# verify protocol version
 			print $h "version\n";
 			$x = <$h>;
-			next TRYCONNECT if (!defined($x));
+			next OPENCONNECTION if (!defined($x));
 			($x) = $x =~ m/^200 version (.+)/;
 			die("unable to determine server's protocol version\n")
 				unless (defined($x));
@@ -102,7 +94,7 @@ sub _ensureconnect {
 
 			# set our client name -- do auth here in the future
 			my $me = `/bin/hostname`; chomp $me;
-			print $h "name $me($$,jbsdl)\n";
+			print $h sprintf('name %s(%d,%s)%s', $me, $$, $this->{clientlabel}, "\n");
 			$x = <$h>; # dump response line
 			last if defined($x);
 		}
@@ -149,6 +141,20 @@ sub _populate_status {
 		Logger::logger("unable to get status, result was $st");
 		$this->{status} = {};
 	}
+}
+
+sub _populate_top {
+	my $this = shift;
+	my $type = shift;
+	return if (exists($this->{"toplastupdate$type"}) && $this->{"toplastupdate$type"}+300 > time());
+	my $st = $this->_do_cmd("top 150 $type");
+	if (ref($st) eq 'ARRAY') {
+		$this->{"top$type"} = $st;
+	} else {
+		Logger::logger("unable to get top $type, result was $st");
+		$this->{"top$type"} = {};
+	}
+	$this->{"toplastupdate$type"} = time();
 }
 
 sub _populate_random {
@@ -222,6 +228,18 @@ sub _populate_stats {
 		Logger::logger("unable to get stat info from server, result was $x");
 		$this->{stats} = {};
 	}
+}
+
+sub top_rankings {
+	my $this = shift;
+	my $type = shift;
+	
+	$this->_populate_top($type);
+	my $x = $this->{"top$type"};
+	if (ref($x) ne 'ARRAY') {
+		return [];
+	}
+	return [@{$x}]; # duplicate it
 }
 
 sub random_play {
@@ -548,3 +566,19 @@ sub getlist($) {
 
 1;
 
+#    Thundaural Jukebox
+#    Copyright (C) 2003-2004  Andrew A. Bakun
+#
+#    This program is free software; you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation; either version 2 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program; if not, write to the Free Software
+#    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
