@@ -144,5 +144,10 @@ sub get_widget {
     return $w;
 }
 
+sub draw_background {
+    my $this = shift;
+    return $this->container()->draw_background(@_);
+}
+
 1;
 
