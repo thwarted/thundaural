@@ -65,7 +65,7 @@ if ($check_server) {
 	IO::Socket::INET IO::Select threads threads::shared
 	Thread::Queue LWP LWP::UserAgent XML::Ximple Data::Dumper
 	CDDB_get Ogg::Vorbis::Decoder Audio::Mad MP3::Info IO::File
-	Audio::DSP Audio::Wav
+	Audio::DSP Audio::Wav Ogg::Vorbis::Header::PurePerl
 	/;
 
 	foreach my $mod (@modules) {
