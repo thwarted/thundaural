@@ -39,7 +39,7 @@ sub theme_initialize {
     $this->add_widget(new Themes::Original::RipperIcon(name=>'IconRipper'));
     $this->add_widget(new Themes::Original::NowPlayingIcon(name=>'IconNowPlaying'));
 
-    my $clockarea = new SDL::Rect(-x=>440, -y=>20, -height=>50, -width=>250);
+    my $clockarea = new SDL::Rect(-x=>440, -y=>20, -height=>60, -width=>250);
     my $clock = new Themes::Original::Clock(name=>'clock', area=>$clockarea);
     $this->add_widget($clock);
 

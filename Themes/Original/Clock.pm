@@ -49,7 +49,7 @@ sub draw_info {
     $this->update_every(30000);
     my($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time());
     my @lines = ();
-    push(@lines, sprintf('%02d:%02d %s', ($hour < 12 ? ($hour ? $hour : 12 ) : $hour - 12), $min, ($hour < 12 ? 'am' : 'pm')));
+    push(@lines, sprintf('%d:%02d %s', ($hour < 12 ? ($hour ? $hour : 12 ) : $hour - 12), $min, ($hour < 12 ? 'am' : 'pm')));
 
     my $x = freeze(\@lines);
     if ($force || $x ne $this->{lastlines}) {
