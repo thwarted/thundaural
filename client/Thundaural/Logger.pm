@@ -1,7 +1,5 @@
 #!/usr/bin/perl
 
-# $Header: /home/cvs/thundaural/server/Thundaural/Logger.pm,v 1.2 2004/05/30 09:15:52 jukebox Exp $
-
 package Thundaural::Logger;
 
 use strict;
@@ -14,6 +12,8 @@ our @EXPORT_OK = qw(logger);
 use Sys::Syslog;
 use File::Basename;
 use IO::Handle;
+
+our $showcaller = 1;
 
 my $FH;
 my $mode;
@@ -54,19 +54,22 @@ sub _open_file {
 }
 
 sub logger {
+    my $prefix = '';
+    if ($showcaller) {
         my($package, $filename, $line) = caller(0);
         my(undef, undef, undef, $subroutine) = caller(1);
-    if ($subroutine eq '(eval)') {
+        if ($subroutine eq '(eval)') {
             (undef, undef, undef, $subroutine) = caller(2);
+        }
+        $subroutine = $package if (!$subroutine);
+        $prefix = "$subroutine($line): ";
     }
-    $subroutine = $package if (!$subroutine);
-        my $prefix = "$subroutine($line)";
-        my $format = shift;
-        my $msg = sprintf($format, @_);
+    my $format = shift;
+    my $msg = sprintf($format, @_);
     if ($mode eq 'file') {
-        printf $FH "\%s: \%s\n", $prefix, $msg;
+        printf $FH '%s%s%s', $prefix, $msg, "\n";
     } else {
-        syslog('info', '%s: %s', $prefix, $msg);
+        syslog('info', '%s%s', $prefix, $msg);
     }
 }
 
