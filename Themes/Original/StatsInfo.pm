@@ -31,7 +31,7 @@ sub widget_initialize {
 
     $this->{server} = $main::client;
 
-    $this->{bgcolor} = new SDL::Color(-r=>140, -b=>140, -g=>140);
+    $this->{bgcolor} = new SDL::Color(-r=>160, -b=>160, -g=>160);
     $this->{fgcolor} = new SDL::Color(-r=>0, -b=>0, -g=>0);
     #my $s = new SDL::Surface(-width=>$area->width(), -height=>$area->height(), -depth=>32);
     #$this->surface($s);
