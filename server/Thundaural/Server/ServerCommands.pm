@@ -902,10 +902,10 @@ sub cmd_devices {
 	my $total = 0;
 	my @r = ();
 	foreach my $rx (@$r) {
-		#if ($rx->{type} ne 'command' && $rx->{type} !~ m/^_/) {
+		if ($rx->{type} !~ m/^_/) {
 			# don't print commands, we should keep those private
 			push(@r, sprintf("%s\t%s\n", $rx->{devicename}, $rx->{type}));
-		#}
+		}
 		$total++;
 	}
 	return $this->_format_list(201, "devicename type", [@r]);
