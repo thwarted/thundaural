@@ -212,7 +212,9 @@ sub try_tags {
         }
     }
     foreach my $k (%$tagsx) {
-        $info->{$k} = $tagsx->{$k};
+        my $x = $tagsx->{$k};
+        $x =~ s/`/'/g if ($x);
+        $info->{$k} = $x;
     }
 }
 
