@@ -5,12 +5,19 @@ changes from version 1.7 to 2.0
   prefix "ta" (for _T_hund_A_ural).  All perl modules are moved into the lib/
   directory.
 
-- client has been completely rewritten to be more modular
+- client has been completely rewritten to be more modular.
 
 - new client code supports different themes.  The interface is still closely 
   tied to the (theme's) code, so it's not trivial to create a new theme, but 
   different themes can be created without interfering with the base, original
-  theme
+  theme.  The only theme currently included is named "Original" and is based
+  on the original thundaural theme (with some slight enhancements).
+
+- the contents of the startup/ directory have been updated to match the new
+  directory structure
+
+- added notes about console permissions with X to the startup/README.startup
+  file
 
 - server detects inaccessiblity of the various devices it interacts with and
   will refuse to start up if it they are not accessible, rather than going into
@@ -19,7 +26,10 @@ changes from version 1.7 to 2.0
 - fixed default -w option to aumix in the conf file checkdeps generates
 
 - code should be self-contained now -- that is, no longer need to copy things
-  to elsewhere in the filesystem to get it to work
+  (like the php libs) to elsewhere in the filesystem to get it to work
+
+- the xscreensaver integration has been disabled/removed until I can work 
+  out a better system to get it integrated properly with jukebox statistics
 
 
 changes from version 1.6 to version 1.7
