@@ -16,10 +16,9 @@ use threads::shared;
 use Thread::Queue;
 
 use File::Basename;
-
 use Data::Dumper;
-
 use DBI;
+use Cwd;
 
 use Thundaural::Server::Settings;
 use Thundaural::Logger qw(logger);
@@ -124,30 +123,41 @@ sub run {
 		last RUN if (!$main::run);
 
 		my $ripcmd = Thundaural::Server::Settings::command('ripcdrom');
-		my @ppargs = split(/\s+/, $ripcmd);
-		{
-			my @x = ();
+		#my @ppargs = split(/\s+/, $ripcmd);
+		#{
+		#	my @x = ();
+		#	my $dbfile = $this->{-dbfile};
+		#	my $devicefile = $this->{-devicefile};
+		#	foreach my $y (@ppargs) {
+		#		$y =~ s/\$\{DEVICEFILE\}/$devicefile/g;
+		#		$y =~ s/\$\{DBFILE\}/$dbfile/g;
+		#		$y =~ s/\$\{STORAGEDIR\}/$storagedir/g;
+		#		push(@x, $y);
+		#	}
+		#	@ppargs = @x;
+		#}
+		#@ppargs = (@ppargs, '|');
+        #my $cmd = join(' ', @ppargs);
+        my $cmd = $ripcmd;
+        {
 			my $dbfile = $this->{-dbfile};
-			my $devicefile = $this->{-devicefile};
-			foreach my $y (@ppargs) {
-				$y =~ s/\${DEVICEFILE}/$devicefile/g;
-				$y =~ s/\${DBFILE}/$dbfile/g;
-				$y =~ s/\${STORAGEDIR}/$storagedir/g;
-				push(@x, $y);
-			}
-			@ppargs = @x;
-		}
-		@ppargs = (@ppargs, '|');
+		    my $devicefile = $this->{-devicefile};
+			$cmd =~ s/\$\{DEVICEFILE\}/$devicefile/g;
+			$cmd =~ s/\$\{DBFILE\}/$dbfile/g;
+			$cmd =~ s/\$\{STORAGEDIR\}/$storagedir/g;
+            $cmd .= " |";
+        }
 
 		my $plread;
-		my $rpid = open($plread, join(' ', @ppargs));
-		logger("rpid = $rpid");
+        logger(getcwd());
+        logger($cmd);
+		my $rpid = open($plread, $cmd);
 		if (!$rpid) {
-			${$this->{-track}} = "error starting ripper: $@";
+			${$this->{-track}} = "error starting ripper: $!";
 			${$this->{-state}} = "idle";
 			next RUN;
 		}
-		logger("started \"".join(' ', @ppargs)."\"");
+		logger("started \"$cmd\" = pid $rpid");
 		my $readthr = threads->new(sub { $this->_read_status($plread, $rpid); } );
 
 		TILLFINISHED:
