@@ -8,6 +8,7 @@ use strict;
 use warnings;
 
 use Thundaural::Client::Track;
+use Thundaural::Logger qw(logger);
 
 my $blankpng = pack('V*', 20617, 18254, 2573, 2586, 0, 3328, 18505, 21060,
 0, 256, 0, 256, 520, 0, 36864, 21367,
@@ -30,7 +31,10 @@ sub new {
         $o{albumid} = $a;
     }
 
-    $this->{tmpdir} = $main::tmpdir;
+    $this->{tmpdir} = $o{tmpdir};
+    if (!$this->{tmpdir}) {
+        $this->{tmpdir} = $main::client->tmpdir();
+    }
     $this->{albumid} = $o{albumid};
     $this->{info} = $o{info};
     $this->{tracks} = [];
@@ -65,6 +69,18 @@ sub AUTOLOAD {
         return $this->{info}->{$g};
     }
     return '';
+}
+
+sub play {
+    my $this = shift;
+    my $channel = shift;
+
+    my $tl = $this->tracklist();
+    logger("playing entire album");
+    foreach my $track (@$tl) {
+        logger('playing '.$track->trackref());
+        $track->play($channel);
+    }
 }
 
 sub tracklist {
@@ -103,6 +119,13 @@ sub coverartfile($) {
 sub _coverart_localfile {
     my $this = shift;
 
+    if (! -e $this->{tmpdir}) {
+        mkdir $this->{tmpdir}, 0700;
+    }
+    if (! -d $this->{tmpdir}) {
+        logger("%s is not a directory, aborting", $this->{tmpdir});
+        exit;
+    }
     if ($this->{albumid} eq 'ripping') {
         return sprintf('%s/thundaural-coverartcache-album-%s-%d.jpg', $this->{tmpdir}, $this->{albumid}, ($this->started() || -1));
     }
