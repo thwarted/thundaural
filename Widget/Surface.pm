@@ -64,7 +64,6 @@ sub draw {
     if ($this->should_draw(@_)) {
         if ($this->draw_info(@_)) {
             $this->{_s}->{lastupdate} = $o{ticks};
-            logger("HERE-------------------");
             if (ref($this->{_s}->{surface})) {
                 return $this->request_blit(surface=>$this->{_s}->{surface}, area=>$this->area(), sync=>1, name=>$this->name());
             }
@@ -82,6 +81,7 @@ sub update_every {
     my $this = shift;
 
     $this->{_s}->{updateevery} = shift @_ if (@_);
+    $this->{_s}->{updateevery} = 1000 if (!$this->{_s}->{updateevery});
     return $this->{_s}->{updateevery};
 }
 
