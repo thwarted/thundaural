@@ -119,15 +119,17 @@ if ($sx->{infofile} && !$sx->{cddevice}) {
     my $cadir = sprintf('coverart/%s', &get_sort_dir($cdinfo->{album}->{performersort}));
     mkdir(sprintf('%s/coverart', $sx->{storagedir}), 0777);
     mkdir(sprintf('%s/%s', $sx->{storagedir}, $cadir), 0777);
-    # assume the extension is correct here
-    my($ext) = $cdinfo->{coverarttemp} =~ m/\.(\w+)$/;
-    $cdinfo->{coverartfile} = sprintf('%s/%s - %s - %d - coverart.%s', 
-            $cadir,
-            $cdinfo->{album}->{performer}, 
-            $cdinfo->{album}->{albumname},
-            $$, # some level of uniqueness
-            $ext
-    );
+    if ($cdinfo->{coverarttemp}) {
+        # assume the extension is correct here
+        my($ext) = $cdinfo->{coverarttemp} =~ m/\.(\w+)$/;
+        $cdinfo->{coverartfile} = sprintf('%s/%s - %s - %d - coverart.%s', 
+                $cadir,
+                $cdinfo->{album}->{performer}, 
+                $cdinfo->{album}->{albumname},
+                $$, # some level of uniqueness
+                $ext
+        );
+    }
     $cdinfo->{riptime} = 0;
     foreach my $track (@{$cdinfo->{tracks}}) {
         my $artist = $track->{performer};
@@ -214,7 +216,7 @@ sub add_album {
         if ($e) { $failed = "database update: $e"; last TRANSACTION; }
 
         # do the cover art
-        if (-s $cdinfo->{coverarttemp}) {
+        if ($cdinfo->{coverarttemp} && -s $cdinfo->{coverarttemp}) {
             my $newcafile = sprintf('%s/%s', $sx->{storagedir}, $cdinfo->{coverartfile});
             if (!(&move_file($cdinfo->{coverarttemp}, $newcafile))) {
                 $failed = "renaming cover art failed: $!";
