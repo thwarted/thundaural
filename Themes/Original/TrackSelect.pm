@@ -35,6 +35,9 @@ sub widget_initialize {
     $this->{font} = new SDL::TTFont(-name=>"./fonts/Vera.ttf", -size=>20, -bg=>$this->{bgcolor}, -fg=>$this->{fgcolor});
     $this->{fontbig} = new SDL::TTFont(-name=>"./fonts/Vera.ttf", -size=>34, -bg=>$this->{bgcolor}, -fg=>$this->{fgcolor});
 
+    $this->{namestart} = 2 + $this->{fontbig}->width('88')+10;
+    $this->{infowidth} = $this->{font}->width('never played');
+
     $this->{face} = new SDL::Surface(-width=>$area->width(), -height=>$area->height(), -depth=>32);
 
     $this->{track} = $o{track};
@@ -83,12 +86,8 @@ sub set_track {
         $vert = 14;
     }
     push(@numtext, "$toffset");
-    if ($track_display_mode == 1) {
-        $this->{font}->print_lines_justified(just=>0, surf=>$this->{face}, x=>int($this->{face}->width()/2), y=>$vert, lines=>\@tracktext);
-        $this->{fontbig}->print_lines_justified(just=>-1, surf=>$this->{face}, x=>2, y=>5, lines=>\@numtext);
-        $this->{fontbig}->print_lines_justified(just=>1, surf=>$this->{face}, x=>$this->{face}->width()-2, y=>5, lines=>\@numtext);
-    } else {
-        my $namestart = 2 + $this->{fontbig}->width('88')+10;
+    if ($track_display_mode == 3) {
+        my $namestart = $this->{namestart};
         my $maxwidth = $this->{face}->width() - $namestart - 75;
         my $infotext = [ 
                 sectotime($track->length(), my $short = 1),
@@ -97,6 +96,27 @@ sub set_track {
         $this->{fontsmall}->print_lines_justified(just=>1,  surf=>$this->{face}, x=>$this->{face}->width()-5, y=>7, lines=>$infotext);
         $this->{font}->print_lines_justified(just=>-1, surf=>$this->{face}, x=>$namestart, y=>$vert, lines=>\@tracktext, 'truncate'=>1, maxwidth=>$maxwidth);
         $this->{fontbig}->print_lines_justified(just=>-1, surf=>$this->{face}, x=>2, y=>5, lines=>\@numtext);
+    } elsif ($track_display_mode == 2) {
+        my $namestart = $this->{namestart};
+        my $maxwidth = $this->{face}->width() - $namestart - $this->{infowidth};
+        if (scalar @tracktext == 1) {
+            if ($this->{font}->width($tracktext[0]) > $maxwidth) {
+                @tracktext = $this->{font}->wrap(rect=>new SDL::Rect(-width=>$maxwidth, -height=>$this->area->height()), lines=>\@tracktext, donttruncate=>1);
+                $vert = 0;
+            }
+        }
+        my $infotext = [ 
+                sectotime($track->length(), my $short = 1),
+                english_rank($track->rank()),
+                ];
+        $this->{fontsmall}->print_lines_justified(just=>1,  surf=>$this->{face}, x=>$this->{face}->width()-5, y=>7, lines=>$infotext);
+        $this->{font}->print_lines_justified(just=>-1, surf=>$this->{face}, x=>$namestart, y=>$vert, lines=>\@tracktext, 'truncate'=>1, maxwidth=>$maxwidth);
+        $this->{fontbig}->print_lines_justified(just=>-1, surf=>$this->{face}, x=>2, y=>5, lines=>\@numtext);
+    } else {
+        # alternative, old track display mode that isn't as smart
+        $this->{font}->print_lines_justified(just=>0, surf=>$this->{face}, x=>int($this->{face}->width()/2), y=>$vert, lines=>\@tracktext);
+        $this->{fontbig}->print_lines_justified(just=>-1, surf=>$this->{face}, x=>2, y=>5, lines=>\@numtext);
+        $this->{fontbig}->print_lines_justified(just=>1, surf=>$this->{face}, x=>$this->{face}->width()-2, y=>5, lines=>\@numtext);
     }
 
     $this->set_frame(frame=>0, surface=>$this->{face}, resize=>0);
