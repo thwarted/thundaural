@@ -37,7 +37,7 @@ sub listenhost {
 }
 
 sub audio_ripper_version {
-    return "Thundaural v1.8 Audio Ripper";
+    return "Thundaural v1.7 Audio Ripper";
 }
 
 sub dbfile {
