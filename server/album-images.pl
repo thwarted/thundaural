@@ -120,9 +120,9 @@ EOF
 
 sub list_albums {
     my $q = "select p.*, a.*, p.name as performername, count(i.albumid) as images
-            from albums a left join albumimages i on a.albumid = i.albumid, performers p
-            where a.performerid = p.performerid
-            group by i.albumid
+            from albums a left join albumimages i on a.albumid = i.albumid 
+                 left join performers p on a.performerid = p.performerid
+            group by a.albumid
             order by p.sortname, a.albumid";
     my $sth = $dbh->prepare($q);
     $sth->execute();
