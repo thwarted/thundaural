@@ -43,7 +43,7 @@ eval "use Thundaural::Server::Settings;"; # this is to get the quick --passthru 
 my $sx = {};
 my $taversion = Thundaural::Server::Settings::audio_ripper_version();
 my $accepteddbversion = 5;
-my $bin_getcoverart = './getcoverart.php';
+my $bin_getcoverart = './tagetcoverart';
 my $preripped = 0;
 
 use Thundaural::Util;
@@ -699,7 +699,7 @@ sub find_audio_ripper {
         cdparanoia
     /;
     my $progopts = {
-        dagrab=>'-d $cddevice $track -J -f -',
+        dagrab=>'-d $cddevice $track -J -n 64 -f -',
         cdda2wav=>'--no-infofile --device $cddevice --track $track+$track --output-format wav -',
         cdparanoia=>'--force-cdrom-device $cddevice --stderr-progress --output-wav $track -',
     };
