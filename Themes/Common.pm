@@ -36,6 +36,7 @@ sub sectotime {
 sub english_rank {
     my $rank = shift;
 
+    # note that "never played" is the longest string
     return 'never played' if (!$rank);
 
     return 'first' if ($rank == 1);
