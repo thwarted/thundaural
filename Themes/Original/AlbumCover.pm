@@ -48,7 +48,7 @@ sub set_album {
     } else {
         $this->{blank}->fill(0, $this->{bgcolor});
 
-        my @text = $this->{font}->wrap($this->{blank}, $album->performer(), ' ', $album->name());
+        my @text = $this->{font}->wrap(rect=>$this->{blank}, lines=>[$album->performer(), ' ', $album->name()]);
         my $textheight = $this->{font}->height() * (scalar @text);
         my $surfheight = $this->{blank}->height();
         my $y = ($surfheight - $textheight) / 2;
