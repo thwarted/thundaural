@@ -29,19 +29,26 @@ sub widget_initialize {
 
     $this->{server} = $main::client;
 
-    my $acarea = new SDL::Rect(-x=>10, -y=>105, -height=>230, -width=>230);
-    $this->add_widget(new Themes::Original::AlbumCover(name=>'AlbumCover', area=>$acarea));
-
-    my $ifarea = new SDL::Rect(-width=>1024-10-10-230-10, -height=>768-105-10, -x=>10+230+10, -y=>105);
-    $this->add_widget(new Themes::Original::NowPlayingInfo(name=>'nowplayinginfo', area=>$ifarea));
-
-    my $dsarea = new SDL::Rect(-width=>40, -height=>360, -x=>10, -y=>370);
     my $bgcolor = new SDL::Color(-r=>140, -g=>140, -b=>140);
     my $fgcolor = new SDL::Color(-r=>180, -g=>180, -b=>180);
     my $labelcolor = new SDL::Color(-r=>0, -g=>0, -b=>0);
+    my $f = new SDL::TTFont(-name=>"./fonts/Vera.ttf", -size=>14, -bg=>$fgcolor, -fg=>$labelcolor);
 
-    my $f = new SDL::TTFont(-name=>"./fonts/Vera.ttf", -size=>21, -bg=>$fgcolor, -fg=>$labelcolor);
-    my $vs = new Widget::ProgressBar(name=>'volumeselect', area=>$dsarea, bgcolor=>$bgcolor, fgcolor=>$fgcolor, font=>$f);
+    my $acarea = new SDL::Rect(-x=>10, -y=>105, -height=>230, -width=>230);
+    $this->add_widget(new Themes::Original::AlbumCover(name=>'AlbumCover', area=>$acarea));
+
+    my $ifarea = new SDL::Rect(-width=>1024-10-10-230-10, -height=>768-105-10, -x=>10+230+10, -y=>121); # 105 + 16
+    $this->add_widget(new Themes::Original::NowPlayingInfo(name=>'nowplayinginfo', area=>$ifarea));
+
+    my $sparea = new SDL::Rect(-width=>400, -height=>16, -x=>10+230+10, -y=>105);
+    my $sp = new Widget::ProgressBar(name=>'songprogress', area=>$sparea, bgcolor=>$bgcolor, fgcolor=>$fgcolor, font=>$f);
+    $sp->type('bar');
+    $sp->orientation('h');
+    $this->add_widget($sp);
+
+    my $vsarea = new SDL::Rect(-width=>40, -height=>360, -x=>10, -y=>370);
+
+    my $vs = new Widget::ProgressBar(name=>'volumeselect', area=>$vsarea, bgcolor=>$bgcolor, fgcolor=>$fgcolor);
     $vs->set_onClick( sub { my $this = shift; my %o = @_; $this->percent_full($o{percentage}); } );
     $vs->type('bar');
     $vs->orientation('v');
