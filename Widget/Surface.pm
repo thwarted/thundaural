@@ -25,7 +25,7 @@ sub new {
     bless $this, $class;
 
     $this->{_s} = {};
-    $this->{_s}->{surface} = undef;
+    $this->{_s}->{surface} = $o{surface};
     $this->{_s}->{updateevery} = 5000; # default every 5 seconds
     $this->{_s}->{lastupdate} = 0;
 
@@ -37,7 +37,6 @@ sub new {
 sub start {
     my $this = shift;
 
-    $this->draw_info();
     $this->{_s}->{lastupdate} = -1;
 }
 
@@ -46,6 +45,7 @@ sub should_draw {
     my %o = @_;
 
     return 0 if (!$this->{_s}->{lastupdate});
+    return 0 if (!defined($this->{_s}->{updateevery}));
     my $ticks = $o{ticks};
     my $diff = $ticks - $this->{_s}->{lastupdate};
     return ($diff >= $this->{_s}->{updateevery});
@@ -56,6 +56,7 @@ sub draw {
     my %o = @_;
 
     if ($this->{_s}->{lastupdate} == -1) {
+        $this->draw_info(@_);
         if (ref($this->{_s}->{surface})) {
             $this->{_s}->{lastupdate} = 1;
             return $this->request_blit(surface=>$this->{_s}->{surface}, area=>$this->area(), sync=>1, name=>$this->name());
@@ -81,7 +82,7 @@ sub update_every {
     my $this = shift;
 
     $this->{_s}->{updateevery} = shift @_ if (@_);
-    $this->{_s}->{updateevery} = 1000 if (!$this->{_s}->{updateevery});
+    $this->{_s}->{updateevery} = 1000 if (defined($this->{_s}->{updateevery}) && !$this->{_s}->{updateevery});
     return $this->{_s}->{updateevery};
 }
 
@@ -92,6 +93,11 @@ sub surface {
         $this->{_s}->{surface} = shift @_;
     }
     return $this->{_s}->{surface};
+}
+
+sub draw_info {
+    # child should override
+    return 0;
 }
 
 1;
