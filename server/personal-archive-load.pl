@@ -65,7 +65,7 @@ foreach my $albumdir (@ARGV) {
             #print "$file\n";
 
             my $audioinfo = &get_audio_info($file);
-            print "\t- AUDI: ".Dumper($audioinfo)."\n";
+            #print "\t- AUDI: ".Dumper($audioinfo)."\n";
 
             my $metadata = {};
             foreach my $loc (@metadata_location) {
@@ -75,9 +75,9 @@ foreach my $albumdir (@ARGV) {
                 if ($loc eq 'filename') {
                     &try_filename($file, $metadata);
                 }
-                print Dumper($metadata)."\n";
+                #print Dumper($metadata)."\n";
             }
-            print "\t- INFO: ".Dumper($metadata)."\n";
+            #print "\t- INFO: ".Dumper($metadata)."\n";
             if ($audioinfo) {
                 $track->{length} = $audioinfo->{length};
                 if ($track->{length} != int($track->{length})) {
@@ -102,7 +102,6 @@ foreach my $albumdir (@ARGV) {
             }
             push(@$tracks, $track);
         }
-        print "\n\n";
     }
 
     my @t = sort { $a->{tracknum} <=> $b->{tracknum} } @$tracks;
@@ -181,17 +180,13 @@ sub try_tags {
     my $file = shift;
     my $info = shift;
 
-    print "-1\n";
     my $tagsx = {};
     if ($mp3) {
         $tagsx = MP3::Info::get_mp3tag($file);
     }
     if ($vorbis) {
-        print "0\n";
         my $o = new Ogg::Vorbis::Header::PurePerl($file);
-        print "1\n";
         if ($o) {
-            print "2\n";
             $tagsx = {};
             my @k = $o->comment_tags();
             #title=Echoes (Life in the Mines)
