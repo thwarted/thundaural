@@ -49,7 +49,7 @@ sub mainloop {
                 -flags=>SDL::SDL_DOUBLEBUF | SDL::SDL_HWSURFACE | SDL::SDL_HWACCEL);
     die("creation of SDL::App failed") if (!$app);
 
-    $client = new Thundaural::Client::Interface(host=>'jukebox', port=>9000, errorfunc=>\&error_message);
+    $client = new Thundaural::Client::Interface(host=>'jukebox', port=>9000, errorfunc=>\&error_message, tmpdir=>$tmpdir);
 
     $theme = new Themes::Original;
     $theme->start();
