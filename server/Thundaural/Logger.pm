@@ -10,7 +10,7 @@ use Sys::Syslog;
 use File::Basename;
 use IO::Handle;
 
-my $showcaller = 1;
+our $showcaller = 1;
 
 my $FH;
 my $mode;
