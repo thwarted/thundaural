@@ -483,9 +483,9 @@ sub coverart {
 		#return undef;
 	}
 
-        open(F, ">$outputfile");
-        print F $bytes;
-        close(F);
+    open(F, ">$outputfile");
+    print F $bytes;
+    close(F);
 
 	return $outputfile;
 }
