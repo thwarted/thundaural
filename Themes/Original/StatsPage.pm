@@ -27,7 +27,7 @@ sub widget_initialize {
 
     $this->{server} = $main::client;
 
-    my $inarea = new SDL::Rect(-width=>1024-20, -height=>768-200-20, -x=>10, -y=>100+10);
+    my $inarea = new SDL::Rect(-width=>1024-20, -height=>768-200-20-100-10, -x=>10, -y=>100+10);
     my $i = new Themes::Original::StatsInfo(name=>'statsinfo', area=>$inarea);
     $this->add_widget($i);
 
