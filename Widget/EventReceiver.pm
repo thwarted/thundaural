@@ -117,15 +117,23 @@ sub should_ignore_event {
 
     my $ret = 0;
     my $diff = $ticks - $this->{_e}->{lastticks};
-    if ($diff < 200 &&
+    if ($diff < 40 &&
         (($this->{_e}->{lastevent} == SDL::SDL_MOUSEBUTTONDOWN && $type == SDL::SDL_MOUSEBUTTONUP) ||
          ($this->{_e}->{lastevent} == SDL::SDL_MOUSEBUTTONUP && $type == SDL::SDL_MOUSEBUTTONDOWN))
        ) {
-        logger("ignoring event, too fast");
+        my $typestr;
+        if ($this->{_e}->{lastevent} == SDL::SDL_MOUSEBUTTONDOWN) {
+            $typestr = "MOUSEDOWN";
+        } elsif ($this->{_e}->{lastevent} == SDL::SDL_MOUSEBUTTONUP) {
+            $typestr = "MOUSEUP";
+        } else {
+            $typestr = "other";
+        }
+        logger('ignoring event %s, too fast', $typestr);
         $ret = 1; # event received too fast, ignore it
-        $this->{_e}->{lastticks} = $ticks;
-        $this->{_e}->{lastevent} = $type;
     }
+    $this->{_e}->{lastticks} = $ticks;
+    $this->{_e}->{lastevent} = $type;
     return $ret;
 }
 
@@ -137,8 +145,6 @@ sub receive_event {
 
     return 0 if ($this->should_ignore_event(event=>$event, ticks=>$ticks));
     my $type = $event->type();
-    #$this->{_e}->{lastticks} = $ticks;
-    #$this->{_e}->{lastevent} = $type;
 
     my($inside, $where, $dosub);
     if ($dosub = $this->{_e}->{aevents}->{$type}) {
@@ -149,18 +155,7 @@ sub receive_event {
         $where = $inside ? 'interior' : 'exterior';
     }
     if (defined($dosub)) {
-
-        #if ($type == SDL::SDL_MOUSEBUTTONDOWN) {
-        #    $type = "BUTTON_DOWN";
-        #} elsif ($type == SDL::SDL_MOUSEBUTTONUP) {
-        #    $type = "BUTTON_UP";
-        #}
-        #if ($where ne 'any') {
-        #    logger("%s(%s) got %s event %s", $this->{-name}, $this, $where, $type);
-        #}
-
         eval {
-            #print "calling $dosub\n";
             &$dosub($this, $event, $inside);
         };
         warn($@) if ($@);
@@ -182,6 +177,7 @@ sub receive_event {
             }
         };
         warn ($@) if ($@);
+        return 1;
     }
     return 0;
 }
