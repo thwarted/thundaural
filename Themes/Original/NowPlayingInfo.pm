@@ -20,7 +20,7 @@ use Themes::Common qw(sectotime english_rank);
 
 use base 'Widget::Surface';
 
-my $max_queued_tracks = 6;
+my $max_queued_tracks = 10;
 
 sub widget_initialize {
     my $this = shift;
@@ -87,7 +87,7 @@ sub draw_info {
     my %o = @_;
     my $s = $o{data};
 
-    my(@nowplaying, @queuedup, @mostrecent, $just);
+    my(@nowplaying, @timeleft, @queuedup, @mostrecent, $just);
     my $somethingplaying = 1;
     my $playtimeleft = 0;
     my $device = $s->{device};
@@ -144,19 +144,21 @@ sub draw_info {
     }
 
     my $rpamt = $main::client->random_play_time_remaining($device);
-    #$rpamt = 380000;
     if ($playtimeleft || $rpamt) {
         my $x = $playtimeleft > $rpamt ? $playtimeleft : $rpamt;
         # ballpark it to the minute, don't be too exact
         $x = (int($x / 60)+1) * 60;
-        push(@queuedup, sprintf('About %s of %splay time remaining.', 
+        push(@timeleft, sprintf('About %s of %splay time remaining.', 
                                 Themes::Common::sectotime($x),
                                 $rpamt > $playtimeleft ? 'random ' : '')
             );
     }
+    if (@timeleft) {
+        push(@timeleft, ' ');
+    }
     $just = -1;
 
-    my @lines = (@nowplaying, @queuedup, @mostrecent);
+    my @lines = (@nowplaying, @timeleft, @queuedup, @mostrecent);
     if (! scalar @lines) {
         push(@lines, " ", " ", " ", " ", "Browse albums and pick a track");
         $somethingplaying = 0;
