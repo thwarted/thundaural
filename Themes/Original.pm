@@ -17,6 +17,7 @@ use Themes::Original::AlbumsIcon;
 use Themes::Original::RandomPlayIcon;
 use Themes::Original::StatsIcon;
 use Themes::Original::RipperIcon;
+use Themes::Original::Clock;
 
 use Themes::Original::NowPlayingPage;
 use Themes::Original::AlbumsPage;
@@ -38,6 +39,10 @@ sub theme_initialize {
     $this->add_widget(new Themes::Original::RipperIcon(name=>'IconRipper'));
     $this->add_widget(new Themes::Original::NowPlayingIcon(name=>'IconNowPlaying'));
 
+    my $clockarea = new SDL::Rect(-x=>440, -y=>20, -height=>50, -width=>250);
+    my $clock = new Themes::Original::Clock(name=>'clock', area=>$clockarea);
+    $this->add_widget($clock);
+
     $this->add_widget(new Themes::Original::NowPlayingPage(name=>'NowPlayingPage'));
     $this->add_widget(new Themes::Original::AlbumsPage(name=>'AlbumsPage'));
     $this->add_widget(new Themes::Original::TrackListing(name=>'TrackListing'));
@@ -51,7 +56,7 @@ sub start {
     my $this = shift;
 
     $this->SUPER::start();
-    $this->show_page('AlbumsPage');
+    $this->show_page('NowPlayingPage');
 }
 
 sub show_page {
