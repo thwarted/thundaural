@@ -37,7 +37,7 @@ sub widget_initialize {
     my $acarea = new SDL::Rect(-x=>10, -y=>105, -height=>300, -width=>300);
     $this->add_widget(new Themes::Original::AlbumCover(name=>'AlbumCover', area=>$acarea));
 
-    my $ifarea = new SDL::Rect(-width=>1024-10-10-300-10, -height=>768-105-15, -x=>10+300+10, -y=>126); # 105 + 16
+    my $ifarea = new SDL::Rect(-width=>1024-10-10-300-10, -height=>768-105-15, -x=>10+300+10, -y=>126);
     $this->add_widget(new Themes::Original::NowPlayingInfo(name=>'nowplayinginfo', area=>$ifarea));
 
     my $sparea = new SDL::Rect(-width=>600, -height=>16, -x=>10+300+10, -y=>105);
@@ -48,17 +48,21 @@ sub widget_initialize {
 
     my $vsarea = new SDL::Rect(-width=>40, -height=>290, -x=>10, -y=>440);
     my $vs = new Widget::ProgressBar(name=>'volumeselect', area=>$vsarea, bgcolor=>$bgcolor, fgcolor=>$fgcolor);
-    $vs->set_onClick( sub { my $this = shift; my %o = @_; $this->percent_full($o{percentage}); } );
+    $vs->set_onClick( sub { 
+            my $this = shift; 
+            my %o = @_; 
+            my $pct = $o{percentage};
+            $this->percent_full($pct); 
+            my @outputs = @{$main::client->devices('play')};
+            @outputs = (shift @outputs); # just do the first one
+            $main::client->volume( shift @outputs, int($pct * 100));
+    } );
     $vs->type('bar');
     $vs->orientation('v');
     $this->add_widget($vs);
 
     $this->add_widget(new Themes::Original::SongPause(name=>'songpause'));
     $this->add_widget(new Themes::Original::SongSkip(name=>'songskip'));
-
-    #my $clockarea = new SDL::Rect(-x=>80, -y=>730-20, -height=>20, -width=>150);
-    #my $clock = new Themes::Original::Clock(name=>'clock', area=>$clockarea);
-    #$this->add_widget($clock);
 
     my %vicons = (loud=>348+70, quiet=>730);
     foreach my $iconlabel (keys %vicons) {
