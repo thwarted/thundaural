@@ -609,6 +609,39 @@ sub stats {
     return {%{$this->{stats}}}; # make a copy for the caller
 }
 
+sub play {
+    my $this = shift;
+    my $track = shift;
+    my $channel = shift;
+    
+    my @args = ('play', $track);
+    push(@args, $channel) if ($channel);
+    my $result = $this->_do_cmd(@args);
+    $this->{queuedonlastupdate} = 0;
+    return (200 <= $result && $result <= 299) ? 1 : 0;
+}   
+    
+sub pause {
+    my $this = shift;
+    my $channel = shift;
+    
+    my @args = ('pause');
+    push(@args, $channel) if ($channel);
+    my $result = $this->_do_cmd(@args);
+    return (200 <= $result && $result <= 299) ? 1 : 0;
+}   
+
+sub skip {
+    my $this = shift;
+    my $channel = shift;
+
+    my @args = ('skip');
+    push(@args, $channel) if ($channel);
+    my $result = $this->_do_cmd(@args);
+    $this->{queuedonlastupdate} = 0;
+    return (200 <= $result && $result <= 299) ? 1 : 0;
+}
+
 1;
 
 #    Thundaural Jukebox
