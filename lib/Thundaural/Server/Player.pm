@@ -74,7 +74,7 @@ sub new {
 		$this->{audiowriters}->{$devicename} = $ti;
 	}
 
-        return $this;
+    return $this;
 }
 
 sub run {

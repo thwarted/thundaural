@@ -7,6 +7,7 @@ package Thundaural::Server::Threads;
 use strict;
 use warnings;
 
+use Data::Dumper;
 use Carp;
 
 use threads;
@@ -32,12 +33,28 @@ sub start_players {
 	my $dblock = shift;
 	croak("start_players not passed a reference to dblock") if (!ref($dblock));
 
+	my $playdevs = Thundaural::Server::Settings::get_of_type('play');
+    # verify accessiblity of the device files
+    foreach my $pd (@$playdevs) {
+        my $devname = $pd->{devicename};
+        my $devfile = Thundaural::Server::Settings::get($devname, 'play');
+        if (!-r $devfile || !-w $devfile) {
+            my $msg = "$devfile is not accessible";
+            logger($msg);
+            die("$msg\n");
+        }
+        my $mixer = Thundaural::Server::Settings::get($devname, 'mixer');
+        if (!-r $mixer || !-w $mixer) {
+            my $msg = "$mixer is not accessible";
+            logger($msg);
+            die("$msg\n");
+        }
+    }
 	# we create one thread, and the player object takes care
 	# of writing to all the devices. but our reference to the
 	# output device needs a name, so use the first one specified
 	# in the config -- this name will be used to manipulate all
 	# the devices
-	my $playdevs = Thundaural::Server::Settings::get_of_type('play');
 	my $maindev = $playdevs->[0];
 	my $device = $maindev->{devicename};
 	my $playerthrs = {};
@@ -54,8 +71,15 @@ sub start_readers {
 
 	my $readerthrs = {};
 	my $readdevs = Thundaural::Server::Settings::get_of_type('read');
+    # check access and start up the threads
 	foreach my $ro (@$readdevs) {
 		my $device = $ro->{devicename};
+        my $devfile = Thundaural::Server::Settings::get($device, 'read');
+        if (!-r $devfile || !-w $devfile) {
+            my $msg = "$devfile is not accessible";
+            logger($msg);
+            die("$msg\n");
+        }
 		$readerthrs->{$device} = &spawn_reader($device, $dblock);
 	}
 	return $readerthrs;
