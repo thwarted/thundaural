@@ -539,12 +539,18 @@ if (0) {
 sub volume {
     my $this = shift;
     my $channel = shift;
+    my $newvol = shift;
 
-    $this->_populate_status();
     if (!$channel) {
         croak("no channel passed to volume");
         return undef;
     }
+    if (defined($newvol)) {
+        $this->_do_cmd('volume', $channel, $newvol);
+        $this->{statuslastupdate} = 0;
+    }
+
+    $this->_populate_status();
     my $vol = $this->{status}->{$channel}->{volume};
     $vol += 0;
     return $vol;
