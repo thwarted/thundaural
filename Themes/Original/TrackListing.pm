@@ -33,7 +33,7 @@ sub widget_initialize {
     my $positions = [];
     foreach my $y (0..MAXTRACKS) { # we'll only support up to 40 tracks on a single album
         #push(@$positions, [250, 105 + $y * 55, 690, 50]);
-        push(@$positions, [250, 160 + $y * 55, 690, 50]);
+        push(@$positions, [250, 160+($y * 55), 690, 50]);
     }
     $this->{positions} = $positions;
     $this->{onscreen} = 10;
@@ -59,6 +59,14 @@ sub widget_initialize {
     $this->add_widget(new Themes::Original::TrackScrollNext(name=>'TrackScrollNext'));
     $this->add_widget(new Themes::Original::TrackScrollPrev(name=>'TrackScrollPrev'));
 
+    my $hsurf = new SDL::Surface(-width=>690, -height=>50, -depth=>32);
+    my $harea = new SDL::Rect(-x=>250, -y=>100, -width=>690, -height=>50);
+    my $header = new Widget::Surface(name=>'header', area=>$harea, surface=>$hsurf);
+    $this->add_widget($header);
+    $this->{headerbgcolor} = new SDL::Color(-r=>160, -g=>160, -b=>160);
+    $this->{headerfgcolor} = new SDL::Color(-r=>0, -g=>0, -b=>0);
+    $this->{headerfont} = new SDL::TTFont(-name=>"./fonts/Vera.ttf", -size=>20, -bg=>$this->{headerbgcolor}, -fg=>$this->{headerfgcolor});
+
     $this->{top} = 0;
 
     #logger("\n\t".join("\n\t", map { $_->name() } @{$this->widgets()} ));
@@ -70,8 +78,23 @@ sub show_album_tracks {
 
     $this->{album} = $o{album};
 
-    my $w = $this->get_widget('AlbumCover');
-    $w->set_album(album=>$o{album});
+    if (my $w = $this->get_widget('AlbumCover')) {
+        $w->set_album(album=>$this->{album});
+    }
+
+    if (my $w = $this->get_widget('header')) {
+        my $s = $w->surface();
+        $s->fill(0, $this->{headerbgcolor});
+        my $area = $w->area();
+        my $xcenter = int($area->width()) / 2;
+        my @lines = ($this->{album}->performer(), $this->{album}->name());
+        $this->{headerfont}->print_lines_justified(just=>0, surf=>$s, x=>$xcenter, y=>0, lines=>\@lines);
+        my $t = new SDL::Rect($area->tohash()); # copy width and height
+        $t->x(0);
+        $t->y($t->height()-2);
+        $s->fill($t, $this->{headerfgcolor});
+        $w->redraw();
+    }
 
     my $tracks = $this->{album}->tracklist();
     $this->{top} = 0;
