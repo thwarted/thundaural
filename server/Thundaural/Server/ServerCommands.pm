@@ -417,7 +417,7 @@ sub cmd_volume {
 	$qcmd =~ s/\${DEVICEFILE}/$mixer/g;
 
 	my $newvol = shift @x;
-	if (defined($newvol) && $newvol =~ m/^\d+$/) {
+	if (defined($newvol)) {
 		if ($newvol !~ m/[+-]?\d+/) {
 			return (400, "400 invalid volume value \"$newvol\"\n");
 		}
