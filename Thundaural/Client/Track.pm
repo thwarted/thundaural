@@ -29,6 +29,12 @@ sub new {
     bless $this, $proto;
 }
 
+sub album {
+    my $this = shift;
+
+    return new Thundaural::Client::Album(trackref=>$this->{info}->{trackref});
+}
+
 sub tohash {
     my $this = shift;
     return $this->{info};
