@@ -5,6 +5,8 @@ package Page::Albums;
 use strict;
 use warnings;
 
+use Carp;
+
 use Logger;
 
 use SDL;
@@ -36,15 +38,21 @@ sub new {
 
 	# passed in options
 	$this->{-server} = $o{-server};
-	die if (ref($this->{-server}) ne 'ClientCommands');
+	croak("-server option is not of class ClientCommands")
+		if (ref($this->{-server}) ne 'ClientCommands');
+
+	$this->{-tmpdir} = $o{-tmpdir};
 
 	$this->{-canvas} = $o{-canvas};
-	die("canvas is not an SDL::Surface") if (!ref($this->{-canvas}) && !$this->{-canvas}->isa('SDL::Surface'));
+	croak("-canvas option is not of class SDL::Surface") 
+		if (!ref($this->{-canvas}) && !$this->{-canvas}->isa('SDL::Surface'));
 
 	$this->{-albums} = $o{-albums};
-	die("passed argument for -albums not an Album object") if (!ref($this->{-albums}) && !$this->{-albums}->isa('Albums'));
+	croak("-albums option is not of class Albums")
+		 if (!ref($this->{-albums}) && !$this->{-albums}->isa('Albums'));
 
 	$this->{-lastalbumoffset} = -1;
+	$this->{-lastalbumcount} = -1;
 	$this->{-albumoffset} = 0; # 80;
 
 	$this->{-positions} = [ [  91,102], [ 91,386], [ 375,102], [375,386], [ 659,102], [659,386]]; # 275x275
@@ -198,7 +206,9 @@ sub update_albums_widgets {
 
 	my $albumcount = $this->{-albums}->count();
 	if ($albumcount) {
-		return if ($this->{-lastalbumoffset} == $this->{-albumoffset});
+		return if ($this->{-lastalbumoffset} == $this->{-albumoffset}
+			&& $this->{-lastalbumcount} == $albumcount);
+		$this->{-lastalbumcount} = $albumcount;
 		my @pos = @{$this->{-positions}};
 		my $perpage = $this->{-albumsperpage};
 		my @widgets = $this->widgets();
@@ -262,11 +272,11 @@ sub _make_empty_notice {
 	$x->set_color_key(SDL::SDL_SRCCOLORKEY, $transparent);
 	$x->fill(0, $transparent);
 	my $g = 0;
-	$this->{-font}->print($x, 0, $g, "No Albums found!");
+	$this->{-font}->print($x, 0, $g, "    No Albums found!");
 	$g += $this->{-font}->height();
 	$this->{-font}->print($x, 0, $g, "Use the rip functionality");
 	$g += $this->{-font}->height();
-	$this->{-font}->print($x, 0, $g, "to add albums.");
+	$this->{-font}->print($x, 0, $g, "    to add albums.");
 
 	return $x;
 }

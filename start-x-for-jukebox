@@ -1,0 +1,11 @@
+#!/bin/bash
+
+DIR=`/usr/bin/dirname $0`
+cd "$DIR"
+USER=$1
+if [ "x$USER" = "x" ]; then
+  echo "$0: specify user to run as for first argument"
+  exit 1
+fi
+/usr/bin/su - $USER -c "xinit '$DIR/xinitrc.sh'"
+sleep 4

@@ -1,7 +1,7 @@
 
 package Albums;
 
-# $Header: /home/cvs/thundaural/client/Albums.pm,v 1.8 2004/01/30 10:16:24 jukebox Exp $
+# $Header: /home/cvs/thundaural/client/Albums.pm,v 1.10 2004/03/21 03:46:50 jukebox Exp $
 
 use strict;
 use warnings;
@@ -18,10 +18,16 @@ sub new {
 	$this->{nextupdate} = 0;
 	$this->{sorted_performer} = [];
 	$this->{iCon} = $opts{Client} || $opts{-server};
+	$this->{-tmpdir} = $opts{-tmpdir};
 
 	$this->_populate();
 
 	return $this;
+}
+
+sub server_connection {
+	my $this = shift;
+	return $this->{iCon};
 }
 
 sub _populate {
@@ -37,7 +43,7 @@ sub _populate {
 			$al->{coverartfile} = $this->_coverart_localfile($al->{albumid});
 			$this->{albums}->{$al->{albumid}} = $al;
 		}
-		$this->{sorted_performer} = $this->_sort_by('performer', 'name');
+		$this->{sorted_performer} = $this->_sort_by('sortname', 'name');
 	} else {
 		$this->{sorted_performer} = [];
 		Logger::logger("failed to populate, defaulting to empty list");
@@ -148,7 +154,7 @@ sub _coverart_localfile {
 	my $this = shift;
 	my $albumid = shift;
 
-	return sprintf("/tmp/thundaural-coverartcache-album%06d.jpg", $albumid);
+	return sprintf('%s/thundaural-coverartcache-album%06d.jpg', $this->{-tmpdir}, $albumid);
 }
 
 sub trackids {

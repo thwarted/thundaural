@@ -1,11 +1,13 @@
 #!/usr/bin/perl
 
-# $Header: /home/cvs/thundaural/client/Page/Ripping.pm,v 1.16 2004/01/30 05:34:12 jukebox Exp $
+# $Header: /home/cvs/thundaural/client/Page/Ripping.pm,v 1.21 2004/03/27 08:19:01 jukebox Exp $
 
 package Page::Ripping;
 
 use strict;
 use warnings;
+
+use Carp;
 
 use Logger;
 
@@ -62,10 +64,14 @@ sub new {
 
 	# passed in options
 	$this->{-server} = $o{-server};
-	die if (ref($this->{-server}) ne 'ClientCommands');
+	croak("-server option is not of class ClientCommands")
+		if (ref($this->{-server}) ne 'ClientCommands');
+
+	$this->{-tmpdir} = $o{-tmpdir};
 
 	$this->{-canvas} = $o{-canvas};
-	die("canvas is not an SDL::Surface") if (!ref($this->{-canvas}) && !$this->{-canvas}->isa('SDL::Surface'));
+	croak("-canvas option is not of class SDL::Surface")
+		if (!ref($this->{-canvas}) && !$this->{-canvas}->isa('SDL::Surface'));
 
 	$this->{-storagedir} = '/home/storage';
 
@@ -90,6 +96,9 @@ sub new {
 	$this->{-lastlines} = ();
 
 	$this->{-coverartfile} = '';
+	$this->{-coverartkey} = '';
+	$this->{-lastcoverartkey} = '';
+	$this->{-lastidletime} = 0;
 	$this->{-coverartsurface} = undef;
 
 	$this->_make();
@@ -202,20 +211,24 @@ sub update {
 				@lines = ("Insert a disc and hit the start button to rip.");
 				push(@lines, " ", $s->{volume}, " ") if ($s->{volume});
 				@lines = $this->wrap($stattextfont, $this->{-srect}->width()-20, $this->{-srect}->height()-20, @lines);
+				$this->{-lastidletime} = time();
 			} elsif ($s->{state} eq 'cleanup') {
 				@lines = $this->wrap($stattextfont, $this->{-srect}->width()-20, $this->{-srect}->height()-20, "cleaning up");
 			} else {
-				if ($s->{trackref} =~ m/\//) {
+				if (defined($s->{trackref}) && ($s->{trackref} =~ m/\//)) {
+					my $x = $s->{performer}; $x =~ s/\W+/_/g;
+					$this->{-coverartkey} = sprintf('%s.%d', $x, $this->{-lastidletime});
+
 					my ($ct, $tt) = $s->{trackref} =~ m/(\d+)\/(\d+)/;
 					push(@lines, sprintf('Ripping track %d of %d %s', $ct, $tt, $s->{volume}));
 					push(@lines, ' ');
 					push(@lines, sprintf('%s - %s', $s->{performer}, $s->{name}));
-					push(@lines, sprintf('%s of %s', $this->sectotime($s->{length}), $s->{genre}));
+					#push(@lines, sprintf('%s of %s', $this->sectotime($s->{length}), $s->{genre}));
+					push(@lines, $this->sectotime($s->{length}));
 					push(@lines, " ");
                    			my $ststr = strftime '%H:%M:%S', localtime($s->{started});
-					#push(@lines, sprintf("started ripping at %s, %s ago", $ststr, $this->sectotime(time() - $s->{started})));
 					push(@lines, sprintf('started ripping at %s', $ststr));
-					push(@lines, sprintf('%d errors at current sector', $s->{current}));
+					#push(@lines, sprintf('%d errors at current sector', $s->{current}));
 				} else {
 					push(@lines, sprintf('%s ', $s->{volume}));
 				}
@@ -226,7 +239,7 @@ sub update {
 					$w->hide(0);
 					$w->pctfull($s->{percentage} / 100);
 					# the rank holds the current ripping speed
-					$w->label(sprintf('%d%% - speed %.2fx', $s->{percentage}, $s->{rank}));
+					$w->label(sprintf('%d%% - speed %.1fx', $s->{percentage}, $s->{rank}));
 				}
 			}
 			$g += $this->print_lines($x, $stattextfont, 10, $g, @lines);
@@ -305,34 +318,23 @@ sub wrap {
 }
 
 sub find_coverartfile {
+	# bah, we're only supporting one reader device here
+	# when we grab the cover art file from the server
 	my $this = shift;
 	my $reader = shift; 
 
-	if ($this->{-coverartfile} && (-s $this->{-coverartfile})) {
-		if (!$this->{-coverartsurface}) {
-			eval {
-				$this->{-coverartsurface} = new SDL::Surface(-name=>$this->{-coverartfile});
-				$this->{-coverartsurface}->display_format();
-				$this->widget("00-coverart-$reader")->surface(0, $this->{-coverartsurface});
-				$this->widget("00-coverart-$reader")->hide(0);
-			};
-			if ($@) {
-				Logger::logger("unable to create surface from ".$this->{-coverartfile}.": $@");
-			}
+	my $caf;
+	if ($this->{-coverartkey} && $this->{-lastcoverartkey} ne $this->{-coverartkey}) {
+		my $tmpfile = sprintf('%s/thundaural-coverart-ripping-%s.jpg', $this->{-tmpdir}, $this->{-coverartkey});
+		if (-e $tmpfile)  {
+			$caf = $tmpfile;
+		} else {
+			$caf = $this->{-server}->coverart('ripping', $tmpfile);
 		}
-	} else {
-		my $sd = $this->{-storagedir};
-		my @cas = ();
-		if (opendir(DIR, $sd)) {
-			@cas = grep { /coverart/ && -f "$sd/$_" } readdir(DIR);
-			closedir DIR;
-		}
-		my $caf = shift @cas;
-		if ($caf) {
-			$caf = "$sd/$caf";
-			if (-s $caf) {
+
+		if (defined($caf) && -s $caf) {
+			if (!$this->{-coverartsurface} || $this->{-lastcoverartkey} ne $this->{-coverartkey}) {
 				$this->{-coverartfile} = $caf;
-				#Logger::logger("using cover art file $caf");
 				eval {
 					$this->{-coverartsurface} = new SDL::Surface(-name=>$this->{-coverartfile});
 					$this->{-coverartsurface}->display_format();
@@ -346,9 +348,12 @@ sub find_coverartfile {
 		} else {
 			$this->{-coverartfile} = '';
 			$this->{-coverartsurface} = '';
+			$this->{-coverartkey} = '';
 			$this->widget("00-coverart-$reader")->hide(1);
 		}
 	}
+
+	$this->{-lastcoverartkey} = $this->{-coverartkey};
 }
 
 sub sectotime {
@@ -369,9 +374,9 @@ sub sectotime {
 		return join(":", @ret);
 	} else {
 		my @ret = ();
-		push(@ret, "$hrs hours") if ($hrs);
-		push(@ret, "$min minutes") if ($min);
-		push(@ret, "$sec seconds") if ($sec);
+		push(@ret, sprintf('%d hour%s', $hrs, $hrs != 1 ? 's' : '')) if ($hrs);
+		push(@ret, sprintf('%d minute%s', $min, $min != 1 ? 's' : '')) if ($min);
+		push(@ret, sprintf('%d second%s', $sec, $sec != 1 ? 's' : '')) if ($sec);
 		my $last = pop @ret;
 		return join(', ', @ret)." and ".$last;
 	}

@@ -5,6 +5,8 @@ package Page;
 use strict;
 use warnings;
 
+use Carp;
+
 use SDL;
 use SDL::Constants;
 use SDL::Event;
@@ -22,7 +24,8 @@ sub new {
 	$this->{-appstate} = $o{-appstate};
 	$this->{-lastticks} = 0;
 	$this->{-lastevent} = 0;
-	die("-bgfill must be an SDL::Color") if ($this->{-bgfill} && ref($this->{-bgfill}) ne 'SDL::Color');
+	croak("-bgfill options is not of class SDL::Color")
+		if ($this->{-bgfill} && ref($this->{-bgfill}) ne 'SDL::Color');
 	return $this;
 }
 

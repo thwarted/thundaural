@@ -1,11 +1,13 @@
 #!/usr/bin/perl
 
-# $Header: /home/cvs/thundaural/client/Page/NowPlaying.pm,v 1.9 2004/01/30 05:34:12 jukebox Exp $
+# $Header: /home/cvs/thundaural/client/Page/NowPlaying.pm,v 1.10 2004/03/27 08:19:01 jukebox Exp $
 
 package Page::NowPlaying;
 
 use strict;
 use warnings;
+
+use Carp;
 
 use Logger;
 
@@ -51,13 +53,16 @@ sub new {
 
 	# passed in options
 	$this->{-server} = $o{-server};
-	die if (ref($this->{-server}) ne 'ClientCommands');
+	croak("-server option is not of class ClientCommands")
+		if (ref($this->{-server}) ne 'ClientCommands');
 
 	$this->{-canvas} = $o{-canvas};
-	die("canvas is not an SDL::Surface") if (!ref($this->{-canvas}) && !$this->{-canvas}->isa('SDL::Surface'));
+	croak("-canvas option is not of class SDL::Surface")
+		if (!ref($this->{-canvas}) && !$this->{-canvas}->isa('SDL::Surface'));
 
 	$this->{-albums} = $o{-albums};
-	die("passed argument for -albums not an Album object") if (!ref($this->{-albums}) && !$this->{-albums}->isa('Albums'));
+	croak("-albums option is not class Albums")
+		if (!ref($this->{-albums}) && !$this->{-albums}->isa('Albums'));
 
 	$this->{-storagedir} = '/home/storage';
 	

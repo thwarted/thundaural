@@ -1,9 +1,12 @@
 
 package ScrollArea;
 
-# $Header: /home/cvs/thundaural/client/ScrollArea.pm,v 1.3 2004/01/17 23:23:51 jukebox Exp $
+# $Header: /home/cvs/thundaural/client/ScrollArea.pm,v 1.4 2004/03/27 08:27:58 jukebox Exp $
 
 use strict;
+
+use Carp;
+
 use SDL::Surface;
 use SDL::Rect;
 use EventReceiver;
@@ -21,9 +24,11 @@ sub new {
 
 	$this->{-name} = $opts{-name};
 	$this->{-content} = $opts{-content};
-	die "undefined content surface" if (!defined($this->{-content} || ref($this->{-content} ne 'SDL::Surface')));
+	croak("-content option is not of class SDL::Surface")
+		if (!defined($this->{-content}) || ref($this->{-content} ne 'SDL::Surface'));
 	$this->{-canvas} = $opts{-canvas};
-	die "undefined canvas/drawing surface" if (!defined($this->{-canvas}));
+	croak("-canvas option is not of class SDL::Surface")
+		if (!defined($this->{-canvas}) || ref($this->{-canvas} ne 'SDL::Surface'));
 	$this->{-width} = $opts{-width}		|| 300;
 	$this->{-height} = $opts{-height}	|| 300;
 	$this->{-x} = $opts{-x}			|| 0;

@@ -1,11 +1,13 @@
 #!/usr/bin/perl
 
-# $Header: /home/cvs/thundaural/client/Page/Stats.pm,v 1.3 2004/01/30 10:10:58 jukebox Exp $
+# $Header: /home/cvs/thundaural/client/Page/Stats.pm,v 1.6 2004/03/27 08:19:01 jukebox Exp $
 
 package Page::Stats;
 
 use strict;
 use warnings;
+
+use Carp;
 
 use Logger;
 
@@ -56,10 +58,12 @@ sub new {
 
 	# passed in options
 	$this->{-server} = $o{-server};
-	die if (ref($this->{-server}) ne 'ClientCommands');
+	croak("-server option is not of class ClientCommands")
+		if (ref($this->{-server}) ne 'ClientCommands');
 
 	$this->{-canvas} = $o{-canvas};
-	die("canvas is not an SDL::Surface") if (!ref($this->{-canvas}) && !$this->{-canvas}->isa('SDL::Surface'));
+	croak("-canvas option is not of class SDL::Surface")
+		if (!ref($this->{-canvas}) && !$this->{-canvas}->isa('SDL::Surface'));
 
 	$this->{-storagedir} = '/home/storage';
 
@@ -132,7 +136,7 @@ sub update {
 
 	&main::draw_background($this->{-rect}, $this->{-canvas});
 
-	my $x = $this->{-s};
+	my $surf = $this->{-s};
 	my $g = 10;
 	my $indent = 200;
 
@@ -142,38 +146,56 @@ sub update {
 	$st = \%st;
 
 	my $ss = Dumper($st);
-	my $upsince = time() - $st->{uptime};
-	delete($st->{uptime});
+	my $supsince = time() - $st->{'uptime-server'};
+	my $mupsince = time() - $st->{'uptime-machine'};
+	my $cupsince = time() - $st->{'uptime-client'};
+	delete($st->{'uptime-server'});
+	delete($st->{'uptime-machine'});
+	delete($st->{'uptime-client'});
 
 	if (!exists($this->{-last}->{stats}) || $this->{-last}->{stats} ne $ss) {
 		my @lines = ();
-		push(@lines, sprintf("%d total albums", $st->{albums}));
-		push(@lines, sprintf("%d albums are missing cover art", $st->{albums} - $st->{coverartfiles}));
-		push(@lines, " ");
-		push(@lines, sprintf("%d total tracks", $st->{tracks}));
-		push(@lines, sprintf("\t%d tracks successfully played", $st->{tracksplayed}));
-		push(@lines, sprintf("\t%d tracks skipped", $st->{tracksskipped}));
-		push(@lines, sprintf("\t%d tracks had problems playing", $st->{tracksfailed}));
-		push(@lines, " ");
-		push(@lines, sprintf("%s total storage space", $this->short_mem($st->{storagetotal})));
-		push(@lines, sprintf("\t%s used", $this->short_mem($st->{storageused})));
-		push(@lines, sprintf("\t%s available", $this->short_mem($st->{storageavailable})));
-		push(@lines, " ");
-		push(@lines, sprintf("Up since %s", strftime('%a %b %e %H:%M:%S %Y', localtime($upsince))));
+		my $x;
 
-		$g += $this->print_lines($x, $statsfont, 10, $g, @lines);
+		$x = $st->{albums} || 0;
+		push(@lines, $x ? sprintf('%d album%s', $x, ($x == 1 ? '' : 's')) : 'No albums' );
+
+		if ($x = (($st->{albums} || 0) - ($st->{coverartfiles} || 0)) ) {
+			push(@lines, sprintf('%d album%s %s missing cover art', $x, ($x == 1 ? '' : 's') , ($x == 1 ? 'is' : 'are') ));
+		} else {
+			push(@lines, "");
+		}
+		push(@lines, "");
+		$x = $st->{tracks} || 0;
+		push(@lines, $x ? ($x == 1 ? '1 track' : "$x total tracks") : 'No tracks' );
+		$x = $st->{'tracks-played'};
+		push(@lines, sprintf("\t%s tracks successfully played", ($x ? $x : 'No') ));
+		$x = $st->{'tracks-skipped'} || 0;
+		push(@lines, sprintf("\t%s tracks skipped", ($x ? $x : 'No') ));
+		$x = $st->{'tracks-failed'} || 0;
+		push(@lines, sprintf("\t%s tracks have had problems playing", ($x ? $x : 'No') ));
+		push(@lines, "");
+		push(@lines, sprintf("%s total storage space", $this->short_mem($st->{'storage-total'})));
+		push(@lines, sprintf("\t%s used", $this->short_mem($st->{'storage-used'})));
+		push(@lines, sprintf("\t%s available", $this->short_mem($st->{'storage-available'})));
+		push(@lines, "");
+		push(@lines, sprintf("Server software up since %s", strftime('%a %b %e %H:%M:%S %Y', localtime($supsince))));
+		push(@lines, sprintf("Server machine up since %s", strftime('%a %b %e %H:%M:%S %Y', localtime($mupsince))));
+		push(@lines, sprintf("Client connected since %s", strftime('%a %b %e %H:%M:%S %Y', localtime($cupsince))));
+
+		$g += $this->print_lines($surf, $statsfont, 10, $g, @lines);
 		$this->{-last}->{stats} = $ss;
 
 		{
 			my $w = $this->widget('99-diskusage');
-			$w->pctfull($st->{storagepercentagefull}/100);
-			$w->label(sprintf('storage space - %d%% full', $st->{storagepercentagefull}));
+			$w->pctfull($st->{'storage-percentagefull'}/100);
+			$w->label(sprintf('storage space - %d%% full', $st->{'storage-percentagefull'}));
 		}
 		$blit = 1;
 	}
 
 	if ($blit) {
-		$x->blit(0, $this->{-canvas}, $this->{-srect});
+		$surf->blit(0, $this->{-canvas}, $this->{-srect});
 		$this->draw();
 		if ($this->{-canvas}->isa('SDL::App')) {
 			$this->{-canvas}->sync();
@@ -193,6 +215,7 @@ sub print_lines {
 	my $c = 0;
 	my $g = 0;
 	foreach my $l (@lines) {
+		if ($l =~ m/^\s*$/) { $l = " "; }
 		if (!$this->{-lastlines}->[$c] || $l ne $this->{-lastlines}->[$c]) {
 			$l =~ s/\t/        /g;
 			$surface->fill(new SDL::Rect(-width=>$this->{-srect}->width()-20, -height=>$font->height(), -x=>10, -y=>$y+$g),

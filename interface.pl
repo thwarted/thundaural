@@ -1,13 +1,16 @@
 #!/usr/bin/perl
 
-# $Header: /home/cvs/thundaural/client/interface.pl,v 1.13 2004/01/27 08:10:05 jukebox Exp $
+# $Header: /home/cvs/thundaural/client/interface.pl,v 1.20 2004/03/27 08:34:35 jukebox Exp $
 
 use strict;
 use warnings;
 
 our ($dbh);
 our ($iCon);
-our ($Albums);
+
+# set this to zero if you want the mouse pointer hidden, like
+# if you are using a touchscreen
+my $show_mouse_cursor = 1;
 
 my $xscreensaver_start = 'xscreensaver-command -activate';
 
@@ -57,6 +60,7 @@ our $E_ANIMATE=SDL::SDLK_AT;
 
 our $app = &setup($WIN_X, $WIN_Y);
 
+my $Albums;
 my $menuarea = new SDL::Rect(-width=>$WIN_X, -height=>98, -x=>0, -y=>0);
 my $pagearea = new SDL::Rect(-width=>$WIN_X, -height=>$WIN_Y-94, -x=>0, -y=>98);
 
@@ -69,7 +73,10 @@ my $state = {
 my $imgsurfaces = &load_images;
 
 my $pages = {};
-&setup_pages;
+my $instance_tmpdir = '';
+&setup_theme(@ARGV);
+
+END { my $x = $?; if ($instance_tmpdir && -d $instance_tmpdir) { `/bin/rm -rf $instance_tmpdir`; } $? = $x; }
 
 my $menuwidgets = &make_menu_widgets;
 
@@ -200,7 +207,6 @@ sub show_error_message {
 	my $errormsg = shift;
 	my $cp = $state->{current_page};
 	$state->{current_page} = 'error';
-	Logger::logger("state = ".($state->{current_page}));
 	$pages->{$state->{current_page}}->now_viewing(); # notify the page it's being viewed
 	$pages->{$state->{current_page}}->update($errormsg);
 	$pages->{$state->{current_page}}->draw();
@@ -346,17 +352,22 @@ sub min {
 
 sub setup {
 	my ($x, $y) = @_;
-	my $app = new SDL::App( -title => 'Jukebox',
+	my $app = new SDL::App( -title => 'Thundaural Jukebox',
 				-width => $x,
 				-height => $y,
 				-depth => 24,
-			# can't  go fullscreen, because then the touchscreen doesn't work
+			# can't go fullscreen, because then 
+			# the touchscreen doesn't work
 			# with a hidden mouse pointer
 				-full => 0,
-				-flags => SDL::SDL_DOUBLEBUF | SDL::SDL_HWSURFACE | SDL::SDL_HWACCEL );
-	my $hostname = `/bin/hostname`;
-	chomp $hostname;
-	if ($hostname =~ m/jukebox/) {
+				-flags => SDL::SDL_DOUBLEBUF | 
+					SDL::SDL_HWSURFACE | 
+					SDL::SDL_HWACCEL 
+		);
+	if (!$$app) {
+		die("creation of SDL::App failed.\n");
+	}
+	if (!$show_mouse_cursor) {
 		SDL::Cursor::show(0);
 	}
 	return $app;
@@ -408,23 +419,51 @@ sub AUTOLOAD {
 	0;
 }
 
-sub setup_pages {
+sub setup_theme {
+	my($host, $port);
+	while (@_) {
+		$a = shift @_;
+		if ($a =~ m/^--host/) {
+			$host = shift @_;
+		}
+		if ($a =~ m/^--port/) {
+			$port = shift @_;
+		}
+	}
+
 	$pages->{'error'} = new Page::Error(-canvas=>$app, -rect=>$pagearea, -appstate=>$state),
 
-	$iCon = new ClientCommands(-errorfunc=>\&show_error_message, -recoveredfunc=>\&eatevents);
-	$Albums = new Albums(-server=>$iCon);
+	$instance_tmpdir = "/tmp/thundaural-client-cache-$$";
+	mkdir $instance_tmpdir, 0700;
 
-	$pages->{'albums'} = new Page::Albums(-server=>$iCon, -canvas=>$app, -rect=>$pagearea, -appstate=>$state, -albums=>$Albums);
-	$pages->{'tracks'} = new Page::Tracks(-server=>$iCon, -canvas=>$app, -rect=>$pagearea, -appstate=>$state, -albums=>$Albums);
-	$pages->{'idle'} = new Page::NowPlaying(-server=>$iCon, -canvas=>$app, -rect=>$pagearea, -appstate=>$state, -albums=>$Albums);
-	$pages->{'stats'} = new Page::Stats(-server=>$iCon, -canvas=>$app, -rect=>$pagearea, -appstate=>$state);
-	$pages->{'ripping'} = new Page::Ripping(-server=>$iCon, -canvas=>$app, -rect=>$pagearea, -appstate=>$state);
-	$pages->{'random'} = new Page::Random(-server=>$iCon, -canvas=>$app, -rect=>$pagearea, -appstate=>$state);
+	$iCon = new ClientCommands(-errorfunc=>\&show_error_message, -recoveredfunc=>\&eatevents, -host=>$host, -port=>$port);
+	$Albums = new Albums(-server=>$iCon, -tmpdir=>$instance_tmpdir);
+
+	my %args = (
+		-server=>$iCon, 
+		-canvas=>$app, 
+		-rect=>$pagearea, 
+		-appstate=>$state, 
+		-albums=>$Albums,
+		-tmpdir=>$instance_tmpdir
+	);
+
+	$pages->{'albums'} = new Page::Albums(%args);
+	$pages->{'tracks'} = new Page::Tracks(%args);
+	$pages->{'idle'} = new Page::NowPlaying(%args);
+	$pages->{'stats'} = new Page::Stats(%args);
+	$pages->{'ripping'} = new Page::Ripping(%args);
+	$pages->{'random'} = new Page::Random(%args);
 }
 
 sub load_images {
 	my $imgsurfaces;
-	          $imgsurfaces->{'bg'} = new SDL::Surface(-name=>'./images/bgmetal2.png');
+	          #$imgsurfaces->{'bg'} = new SDL::Surface(-name=>'./images/bgmetal2.png');
+	          #$imgsurfaces->{'bg'} = new SDL::Surface(-name=>'./images/1024x768-Big-Cigars-1.png');
+	          $imgsurfaces->{'bg'} = new SDL::Surface(-name=>'./images/1024x768-Appropriately-Left-Handed-1.png');
+	          #$imgsurfaces->{'bg'} = new SDL::Surface(-name=>'./images/1024x768-No-Purchase-Necessary-3.png');
+	          #$imgsurfaces->{'bg'} = new SDL::Surface(-name=>'./images/1024x768-Dinner-With-Anna-3.png');
+
                #$imgsurfaces->{speaker} = new SDL::Surface(-name=>'./images/speaker.png');
      $imgsurfaces->{'goto_nowplaying'} = new SDL::Surface(-name=>"./images/goto-nowplaying.png");
          $imgsurfaces->{'goto_albums'} = new SDL::Surface(-name=>'./images/goto-albums.png');
