@@ -33,7 +33,7 @@ sub widget_initialize {
     $this->add_widget(new Themes::Original::AlbumNext(name=>'albumnext'));
     $this->add_widget(new Themes::Original::AlbumSlider(name=>'albumslider'));
 
-    $this->{album_offset} = 279;
+    $this->{album_offset} = 0;
 
     my $positions = [ 
                         #[   2,120, 50],
@@ -132,23 +132,29 @@ sub hide_nav_buttons {
     my $offset = $this->{album_offset};
     my $total = $this->{server}->albums_count();
     my $max = $total - $this->{albums_per_page};
+    $max = $total if ($max < $total);
 
-    my $b;
-    if ($offset == 0) {
-        $b = $this->get_widget('albumprev');
-        $b->visible(0);
-        $b = $this->get_widget('albumnext');
-        $b->visible(1);
+    logger("offset = $offset");
+    logger("total = $total");
+    logger("max = $max");
+
+    if ($offset == 0 && $total < scalar @{$this->{albumbuttons}}) {
+        $this->get_widget('albumprev')->visible(0);
+        $this->get_widget('albumnext')->visible(0);
+        $this->get_widget('albumslider')->visible(0);
+    } elsif ($offset == 0) {
+        $this->get_widget('albumprev')->visible(0);
+        $this->get_widget('albumnext')->visible(1);
+        $this->get_widget('albumslider')->visible(1);
     } elsif ($offset >= $max) {
-        $b = $this->get_widget('albumprev');
-        $b->visible(1);
-        $b = $this->get_widget('albumnext');
-        $b->visible(0);
+        $this->get_widget('albumprev')->visible(1);
+        $this->get_widget('albumnext')->visible(0);
+        $this->get_widget('albumslider')->visible(1);
     } else {
         $this->get_widget('albumprev')->visible(1);
         $this->get_widget('albumnext')->visible(1);
+        $this->get_widget('albumslider')->visible(1);
     }
-    $this->get_widget('albumslider')->visible(1);
 }
 
 sub update_albumbuttons {

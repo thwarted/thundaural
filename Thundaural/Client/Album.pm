@@ -9,6 +9,14 @@ use warnings;
 
 use Thundaural::Client::Track;
 
+my $blankpng = pack('V*', 20617, 18254, 2573, 2586, 0, 3328, 18505, 21060,
+0, 256, 0, 256, 520, 0, 36864, 21367,
+222, 0, 28681, 22856, 115, 2816, 19, 2816,
+275, 39424, 6300, 0, 1792, 18804, 17741, 54279,
+2570, 6408, 51492, 4198, 45, 0, 18703, 16708,
+30804, 257, 4, 65531, 65280, 65535, 65029, 65026,
+26185, 11118, 0, 0, 17737, 17486, 17070, 33376,);
+
 our $AUTOLOAD;
 
 sub new {
@@ -22,22 +30,27 @@ sub new {
         $o{albumid} = $a;
     }
 
+    $this->{tmpdir} = $main::tmpdir;
     $this->{albumid} = $o{albumid};
     $this->{server} = $main::client;
     $this->{info} = $o{info};
     $this->{tracks} = [];
-    $this->{tmpdir} = $main::tmpdir;
 
     if (!$this->{info}) {
-        my $x = $this->{server}->getlist('album', $this->{albumid});
-        if (ref($x) eq 'ARRAY' && scalar @{$x}) {
-            $this->{info} = shift @{$x};
-        } else {
-            $this->{info} = {};
+        $this->{info} = $this->{server}->album_hash(albumid=>$this->{albumid});
+    }
+    if (!$this->{albumid}) {
+        if ($this->{info}->{type} eq 'read') {
+            $this->{albumid} = 'ripping';
         }
     }
 
     bless $this, $proto;
+}
+
+sub hash {
+    my $this = shift;
+    return {%{$this->{info}}}; # dupe it
 }
 
 sub albumid {
@@ -58,6 +71,9 @@ sub AUTOLOAD {
 sub tracklist {
     my $this = shift;
 
+    if ($this->{albumid} eq 'ripping') {
+        return [];
+    }
     if (! (scalar @{$this->{tracks}}) ) {
         my $x = $this->{server}->getlist('tracks', $this->{albumid});
         my @n = ();
@@ -88,6 +104,9 @@ sub coverartfile($) {
 sub _coverart_localfile {
     my $this = shift;
 
+    if ($this->{albumid} eq 'ripping') {
+        return sprintf('%s/thundaural-coverartcache-album-%s-%d.jpg', $this->{tmpdir}, $this->{albumid}, ($this->started() || -1));
+    }
     return sprintf('%s/thundaural-coverartcache-album%06d.jpg', $this->{tmpdir}, $this->{albumid});
 }
 

@@ -31,8 +31,6 @@ sub widget_initialize {
     $this->add_depressed_frame(file=>'images/ripcdrom-busy.png', resize=>1);
     $this->add_depressed_frame(file=>'images/ripcdrom-busy.png', resize=>1);
 
-    #$this->animate(1000);
-
     $this->SUPER::widget_initialize();
 }
 
@@ -40,16 +38,6 @@ sub onClick {
     my $this = shift;
 
     $main::theme->show_page('RipperPage');
-
-    logger($this->name()." was hit");
-    #my $n = $this->theme()->get_widget('IconNowPlaying');
-    #if ($this->animate()) {
-    #    $this->animate(0);
-    #    $n->animate(0);
-    #} else {
-    #    $this->animate(800);
-    #    $n->animate(700);
-    #}
 }
 
 1;

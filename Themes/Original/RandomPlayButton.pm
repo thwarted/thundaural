@@ -53,10 +53,8 @@ sub onClick {
 
     logger('random play %d on %s', $this->{duration}, $this->{device});
     $main::client->random_play(duration=>$this->{duration}, device=>$this->{device});
-    my $container = $this->container();
-    if ($container) {
-        my $w = $container->get_widget('randomplayinfo')->redraw();
-    }
+    # force the info surface to get new updates as soon as possible
+    $this->container()->get_widget('randomplayinfo')->update_every(150);
 }
 
 1;

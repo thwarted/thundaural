@@ -90,7 +90,7 @@ sub set_track {
         my $namestart = $this->{namestart};
         my $maxwidth = $this->{face}->width() - $namestart - 75;
         my $infotext = [ 
-                sectotime($track->length(), my $short = 1),
+                sectotime($track->length(), short=>1),
                 english_rank($track->rank()),
                 ];
         $this->{fontsmall}->print_lines_justified(just=>1,  surf=>$this->{face}, x=>$this->{face}->width()-5, y=>7, lines=>$infotext);
@@ -106,7 +106,7 @@ sub set_track {
             }
         }
         my $infotext = [ 
-                sectotime($track->length(), my $short = 1),
+                sectotime($track->length(), short=>1),
                 english_rank($track->rank()),
                 ];
         $this->{fontsmall}->print_lines_justified(just=>1,  surf=>$this->{face}, x=>$this->{face}->width()-5, y=>7, lines=>$infotext);

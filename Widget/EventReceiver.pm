@@ -121,6 +121,7 @@ sub should_ignore_event {
         (($this->{_e}->{lastevent} == SDL::SDL_MOUSEBUTTONDOWN && $type == SDL::SDL_MOUSEBUTTONUP) ||
          ($this->{_e}->{lastevent} == SDL::SDL_MOUSEBUTTONUP && $type == SDL::SDL_MOUSEBUTTONDOWN))
        ) {
+        logger("ignoring event, too fast");
         $ret = 1; # event received too fast, ignore it
         $this->{_e}->{lastticks} = $ticks;
         $this->{_e}->{lastevent} = $type;
@@ -134,8 +135,10 @@ sub receive_event {
     my $event = $o{event};
     my $ticks = $o{ticks};
 
-    my $type = $event->type();
     return 0 if ($this->should_ignore_event(event=>$event, ticks=>$ticks));
+    my $type = $event->type();
+    #$this->{_e}->{lastticks} = $ticks;
+    #$this->{_e}->{lastevent} = $type;
 
     my($inside, $where, $dosub);
     if ($dosub = $this->{_e}->{aevents}->{$type}) {

@@ -32,6 +32,10 @@ sub new {
 sub album {
     my $this = shift;
 
+    if ($this->type() eq 'read') {
+        return new Thundaural::Client::Album(info=>$this->{info});
+    }
+    # type = 'play'
     return new Thundaural::Client::Album(trackref=>$this->{info}->{trackref});
 }
 

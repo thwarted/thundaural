@@ -52,7 +52,7 @@ sub draw_info {
     my $ss = freeze($st);
 
     if ($force || !exists($this->{lastlines}) || $this->{lastlines} ne $ss) {
-        $this->update_every(5000);
+        $this->update_every(15000);
         $this->{lastlines} = $ss;
 
         my $supsince = time() - $st->{'uptime-server'};

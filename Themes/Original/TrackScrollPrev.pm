@@ -29,7 +29,7 @@ sub onClick {
 
     logger("button ".$this->name()." was hit!");
     my $c = $this->container();
-    $c->scroll_tracks(dir=>-1);
+    $c->scroll_tracks(dir=>-9);
 }
 
 1;

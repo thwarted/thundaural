@@ -51,6 +51,8 @@ sub theme_initialize {
     $this->add_widget(new Themes::Original::RipperPage(name=>'RipperPage'));
 
     $this->{lastalbumcount} = 0;
+
+    $this->{current_page} = '';
 }
 
 sub start {
@@ -70,9 +72,7 @@ sub show_page {
     foreach my $p (@pages) {
         next if ($p eq $showpage);
         my $w = $this->get_widget($p);
-        if ($w->visible()) {
-            $w->visible(0);
-        }
+        $w->visible(0);
     }
 
     # show only one
@@ -82,6 +82,8 @@ sub show_page {
     } else {
         logger("unable to find page widget $showpage");
     }
+
+    $this->{current_page} = $showpage;
 }
 
 sub heartbeat {
@@ -106,8 +108,9 @@ sub heartbeat {
             }
         }
     }
-    my $w = $this->get_widget('IconNowPlaying')->animate($playing * 600);
-    my $w = $this->get_widget('IconRipper')->animate($ripping * 600);
+    my $w;
+    $w = $this->get_widget('IconNowPlaying')->animate($playing * 600);
+    $w = $this->get_widget('IconRipper')->animate($ripping * 600);
     return 3000;
 }
 

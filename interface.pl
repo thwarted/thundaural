@@ -25,6 +25,8 @@ use Thundaural::Logger qw(logger);
 use Thundaural::Client::Interface;
 
 use Themes::Original;
+my $app;
+our $client;
 our $theme;
 
 mkdir '/tmp/newclient', 0777;
@@ -38,32 +40,33 @@ $SIG{__WARN__} = sub { cluck(@_) };
 $SIG{__DIE__} = sub { confess(@_) };
 
 Thundaural::Logger::init('stderr');
-our $client = new Thundaural::Client::Interface(host=>'localhost', port=>9000);
-
-my $al = $client->albums(offset=>0, count=>3);
-foreach my $a (@$al) {
-    print "Album : ".$a->albumid()."\n";
-    print "Name  : ".$a->name()."\n";
-    print "Perf  : ".$a->performer()."\n";
-    print "Tracks: ".$a->tracks()."\n";
-    print(("-"x50)."\n");
-}
 
 &mainloop;
 
 sub mainloop {
 
-    my $app = new SDL::App(-title=>q{Thundaural Jukebox}, -width=>1024, -height=>768, -depth=>24, -full=>0,
+    $app = new SDL::App(-title=>q{Thundaural Jukebox}, -width=>1024, -height=>768, -depth=>24, -full=>0,
                 -flags=>SDL::SDL_DOUBLEBUF | SDL::SDL_HWSURFACE | SDL::SDL_HWACCEL);
     die("creation of SDL::App failed") if (!$app);
 
-    #my $x = new SDL::Surface(-name=>'./images/1024x768-Appropriately-Left-Handed-1.png');
-    #$x->display_format();
-    #$x->blit(0, $app, 0);
+    $client = new Thundaural::Client::Interface(host=>'localhost', port=>9000, errorfunc=>\&error_message);
 
     $theme = new Themes::Original;
     $theme->start();
     $theme->draw_background(canvas=>$app, source=>new SDL::Rect(-width=>$app->width(), -height=>$app->height() ));
+
+    my $al = $client->albums(offset=>0, count=>3);
+    foreach my $a (@$al) {
+        print "Album : ".$a->albumid()."\n";
+        print "Name  : ".$a->name()."\n";
+        print "Perf  : ".$a->performer()."\n";
+        print "Tracks: ".$a->tracks()."\n";
+        print(("-"x50)."\n");
+    }
+
+    #my $x = new SDL::Surface(-name=>'./images/1024x768-Appropriately-Left-Handed-1.png');
+    #$x->display_format();
+    #$x->blit(0, $app, 0);
 
     #my $x = new SDL::Surface(-name=>'images/goto-albums.png');
     #$x->display_format();
@@ -126,5 +129,51 @@ sub mainloop {
         }
     }
     $theme->stop();
+}
+
+sub error_message {
+    my $state = shift;
+
+    if ($state eq 'show') {
+        return &error_show_message(@_);
+    } elsif ($state eq 'idle') {
+        return &error_idle();
+    } elsif ($state eq 'recovered') {
+        if (ref($theme)) {
+            my $area = new SDL::Rect(-width=>$app->width(), -height=>$app->height(), -x=>0, -y=>0);
+            $theme->redraw($area);
+        }
+        return;
+    }
+    logger("unknown error message state \"$state\"");
+}
+
+sub error_show_message {
+    my $bgcolor = new SDL::Color(-r=>160, -g=>160, -b=>160);
+    my $fgcolor = new SDL::Color(-r=>0, -g=>0, -b=>0);
+    $app->fill(0, $bgcolor);
+    my $font = new SDL::TTFont(-name=>"./fonts/Vera.ttf", -size=>17, -bg=>$bgcolor, -fg=>$fgcolor);
+
+    my @lines = qw(hellofd asfd jfas dfd);
+    if (scalar @_ == 1) {
+        @lines = split(/\n/, shift);
+    } else {
+        @lines = @_;
+    }
+    $font->print_lines_justified(just=>0, x=>$app->width() / 2, y=>200, maxwidth=>$app->width()-100, lines=>\@lines, surface=>$app);
+    $app->sync();
+}
+
+sub error_idle {
+    my $nowticks = SDL::App::ticks();
+    while(SDL::App::ticks() - $nowticks < 3000) {
+        my $event = new SDL::Event;
+        while($event->poll()) {
+            my $type = $event->type();
+            if ($type == SDL::SDL_QUIT) { logger("request quit"); exit; }
+            if ($type == SDL::SDL_KEYDOWN) { if ($event->key_name() eq 'q') { logger("exiting"); exit; } }
+        }
+        SDL::App::delay(0, 50);
+    }
 }
 

@@ -52,28 +52,33 @@ sub set_album {
     my $album = $o{album};
     my $force = $o{force};
 
-    my $newalbumid = $album->albumid();
+    my $newalbumid = $album ? $album->albumid() : 0;
+    my $oldalbumid = $this->{album} ? $this->{album}->albumid() : 0;
     #logger('%s: newalbumid = %d, old = %d', $this->name(), $newalbumid, $this->{album}->albumid());
-    if ($force || $this->{album}->albumid() != $newalbumid) {
+    if ($force || $oldalbumid != $newalbumid) {
         $this->{album} = $album;
-        my $coverart = $this->{album}->coverartfile();
-        if (-s $coverart) {
-            $this->set_frame(frame=>0, file=>$coverart, resize=>1);
-            $this->make_depressed_frame();
+        if ($newalbumid) {
+            my $coverart = $this->{album}->coverartfile();
+            if (-s $coverart) {
+                $this->set_frame(frame=>0, file=>$coverart, resize=>1);
+                $this->make_depressed_frame();
+            } else {
+                $this->{blank}->fill(0, $this->{bgcolor});
+
+                my @text = ($album->performer(), ' ', $album->name(), sprintf('%d tracks', scalar @{$album->tracklist()}));
+                @text = $this->{font}->wrap(rect=>$this->{blank}, lines=>\@text);
+
+                my $textheight = $this->{font}->height() * (scalar @text);
+                my $surfheight = $this->{blank}->height();
+                my $y = ($surfheight - $textheight) / 2;
+                $this->{font}->print_lines_justified(just=>0, surf=>$this->{blank}, x=>int($this->{blank}->width() / 2), y=>$y, lines=>\@text);
+                $this->set_frame(frame=>0, surface=>$this->{blank}, resize=>1);
+                $this->make_depressed_frame();
+            }
+            $this->redraw();
         } else {
-            $this->{blank}->fill(0, $this->{bgcolor});
-
-            my @text = ($album->performer(), ' ', $album->name(), sprintf('%d tracks', scalar @{$album->tracklist()}));
-            @text = $this->{font}->wrap(rect=>$this->{blank}, lines=>\@text);
-
-            my $textheight = $this->{font}->height() * (scalar @text);
-            my $surfheight = $this->{blank}->height();
-            my $y = ($surfheight - $textheight) / 2;
-            $this->{font}->print_lines_justified(just=>0, surf=>$this->{blank}, x=>int($this->{blank}->width() / 2), y=>$y, lines=>\@text);
-            $this->set_frame(frame=>0, surface=>$this->{blank}, resize=>1);
-            $this->make_depressed_frame();
+            $this->visible(0);
         }
-        $this->redraw();
     }
 }
 

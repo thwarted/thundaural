@@ -26,7 +26,7 @@ sub widget_initialize {
     $this->SUPER::widget_initialize(@_);
 
     my $area = $this->area();
-    $this->update_every(5000);
+    $this->update_every(50); # force it to update as soon as possible
 
     $this->{server} = $main::client;
 
@@ -47,6 +47,8 @@ sub draw_info {
     my %o = @_;
     my $ticks = $o{ticks};
 
+    $this->update_every(10000) if (!$this->{started}); # okay, we're going to update right after starting up, so reset this to a sane value
+    $this->{started} = 1;
     my @outputs = @{$this->{server}->devices('play')};
     my @lines = ();
     foreach my $device (@outputs) {
@@ -59,10 +61,10 @@ sub draw_info {
         }
         push(@lines, $m, " ");
     }
-    $ticks = 0 if (!$ticks);
-    push(@lines, "ticks = $ticks");
     my $x = freeze(\@lines);
     if ($x ne $this->{lastlines}) {
+        # finally detected the change, so don't query so often now
+        $this->update_every(10000);
         my $area = $this->area();
         my $s = new SDL::Surface(-width=>$area->width(), -height=>$area->height(), -depth=>32);
         $this->{font}->print_lines_justified(just=>0, surf=>$s, x=>$this->area()->width()/2, y=>10, lines=>\@lines);

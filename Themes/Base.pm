@@ -223,5 +223,16 @@ sub draw_background {
     return 1;
 }
 
+sub redraw {
+    my $this = shift;
+    my $area = shift;
+
+    $this->erase_area($area);
+    my $subwidgets = $this->widgets();
+    foreach my $widget (@{$subwidgets}) {
+        $widget->redraw();
+    }
+}
+
 1;
 

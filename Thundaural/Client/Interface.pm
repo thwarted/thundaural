@@ -28,18 +28,20 @@ sub new {
     $this->{port} = $o{port} || 9000;
     $this->{clientlabel} = 'newclient';
 
+    $this->{errorfunc} = $o{errorfunc} || undef;
+
     $this->{_albums} = {lastupdate=>0, list=>{}};
     $this->{_coverartcached} = {};
 
     $this->{status} = {};
     $this->{statuslastupdate} = 0;
-    $this->{status_wait} = 5;
+    $this->{status_wait} = 1;
     $this->{random} = {};
     $this->{randomlastupdate} = 0;
-    $this->{random_wait} = 120;
+    $this->{random_wait} = 1;
     $this->{queuedon} = {};
     $this->{queuedonlastupdate} = 0;
-    $this->{queuedon_wait} = 120;
+    $this->{queuedon_wait} = 10;
     $this->{lasttrackref} = '';
     $this->{stats} = {};
     $this->{statslastupdate} = 0;
@@ -54,10 +56,20 @@ sub new {
     return $this;
 }
 
+sub clear_cache {
+    my $this = shift;
+    $this->{statuslastupdate} = 0;
+    $this->{randomlastupdate} = 0;
+    $this->{queuedonlastupdate} = 0;
+    $this->{statslastupdate} = 0;
+    $this->{deviceslastupdate} = 0;
+    $this->{_albums} = {lastupdate=>0, list=>{}};
+}
+
 sub _albums_populate {
     my $this = shift;
 
-    return if (scalar %{$this->{_albums}->{list}} && $this->{_albums}->{lastupdate} + 30 > time());
+    return if (scalar %{$this->{_albums}->{list}} && $this->{_albums}->{lastupdate} + 300 > time());
 
     my $x = $this->getlist('albums');
     if (ref($x) eq 'ARRAY') {
@@ -98,18 +110,31 @@ sub albums {
 
     $this->_albums_populate();
     my @ax = @{$this->{_albums}->{sorted_performer}};
-    @ax = @ax[$offset .. ($offset+$count-1)];
+    my $last = $offset + $count - 1;
+    $last = $#ax if ($last > $#ax);
+    @ax = @ax[$offset .. $last];
     my @ret = ();
     foreach my $a (@ax) {
         my $i = $this->{_albums}->{list}->{$a};
-        my $albumobj = new Thundaural::Client::Album(info=>$i, server=>$this, albumid=>$i->{albumid});
+        my $albumobj = new Thundaural::Client::Album(info=>{%$i}, server=>$this, albumid=>$i->{albumid});
         push(@ret, $albumobj);
     }
     return \@ret;
 }
 
+sub album_hash {
+    my $this = shift;
+    my %o = @_;
+    my $albumid = $o{albumid};
+
+    $this->_albums_populate();
+    my $i = $this->{_albums}->{list}->{$albumid};
+    return {%$i}; # copy it for the caller
+}
+
 sub albums_count {
     my $this = shift;
+    $this->_albums_populate();
     return scalar keys %{$this->{_albums}->{list}};
 }
 
@@ -118,7 +143,7 @@ sub _precache_coverart {
 
     foreach $a (keys %{$this->{_albums}->{list}}) {
         $a = $this->{_albums}->{list}->{$a};
-        $a = new Thundaural::Client::Album(info=>$a, server=>$this, albumid=>$a->{albumid});
+        $a = new Thundaural::Client::Album(info=>{%$a}, server=>$this, albumid=>$a->{albumid});
         my $x = $a->coverartfile();
         print "precached $x\n";
     }
@@ -134,7 +159,7 @@ sub coverart {
 
     my $bytes = $this->_do_cmd("coverart $albumid");
     if (!$bytes || $bytes =~ m/^\d{3}$/) {
-        logger('no data received for cover art');
+        #logger('no data received for cover art');
         $bytes = '';
         #return undef;
     }
@@ -161,21 +186,22 @@ sub _ensure_connect {
                 $try++;
                 $this->{ihn} = new IO::Socket::INET(PeerAddr=>$this->{server}, PeerPort=>$this->{port}, proto=>'tcp');
                 if ($this->{ihn} && $this->{ihn}->connected()) {
-                    if ($try > 1 && ref($this->{recoveredfunc}) eq 'CODE') {
-                        my $f = $this->{recoveredfunc};
-                        &$f();
+                    if ($try > 1 && ref($this->{errorfunc}) eq 'CODE') {
+                        my $f = $this->{errorfunc};
+                        &$f('recovered');
                     }
                     last TRYCONNECT;
                 }
                 logger("unable to connect to %s:%s", $this->{server}, $this->{port});
                 if (ref($this->{errorfunc}) eq 'CODE') {
                     my $f = $this->{errorfunc};
-                    &$f(sprintf("jukebox server (%s:%s)\nis not responding\n\nPlease wait...\n\ntry $try",
-                        $this->{server}, $this->{port}));
+                    &$f('show', 
+                        sprintf("jukebox server (%s:%s)\nis not responding\n\nPlease wait...\n\ntry $try", $this->{server}, $this->{port})
+                       );
                 }
-                if (ref($this->{idlefunc}) eq 'CODE') {
-                    my $f = $this->{idlefunc};
-                    &$f();
+                if (ref($this->{errorfunc}) eq 'CODE') {
+                    my $f = $this->{errorfunc};
+                    &$f('idle');
                 }
             }
             my $h = $this->{ihn};
@@ -366,6 +392,7 @@ sub random_play {
     $this->{random} = {};
     $this->{randomlastupdate} = -10;
     $this->_do_cmd("randomize $devicename for $minutes");
+    $this->_populate_random();
 }
 
 sub will_random_play_until {
@@ -376,6 +403,18 @@ sub will_random_play_until {
     return (exists($this->{random}->{$dn}) ? $this->{random}->{$dn} : undef);
 }
 
+sub random_play_time_remaining {
+    my $this = shift;
+    my $dn = shift;
+
+    my $end = $this->will_random_play_until($dn);
+    if (defined($end)) {
+        my $len = $end - time();
+        return $len if ($len > 0);
+    }
+    return 0;
+}
+
 sub _populate_status {
     my $this = shift;
     return if ($this->{statuslastupdate}+$this->{status_wait} > time());
@@ -384,6 +423,13 @@ sub _populate_status {
         $this->{status} = {};
         my $ltr = '';
         foreach my $x (@$st) {
+            if ($x->{type} eq 'read') {
+                #my($a,$t) = split(m@/@, $x->{trackref});
+                #$x->{trackid} = $t;
+                #$x->{trackref} = "0/$a";
+                $x->{speed} = $x->{rank};
+                delete($x->{rank});
+            }
             my $dn = $x->{devicename};
             $this->{status}->{$dn} = $x;
             $ltr .= "-".(defined($x->{trackref}) ? $x->{trackref} : 'none');
@@ -399,10 +445,43 @@ sub _populate_status {
     }
 }
 
-sub playing_on {
+sub status_of {
+    # returns a raw hash of the data for a channel, or hash of all channels' data
     my $this = shift;
     my $channel = shift;
 
+    $this->_populate_status();
+    if (0) {
+    if ($channel eq 'cdrom') {
+        return {
+          'performer' => 'Alan Menken and Jack Feldman',
+          'volume' => '',
+          'name' => 'Overture',
+          'devicename' => 'cdrom',
+          'percentage' => '78',
+          'trackid' => '?',
+          'state' => 'ripping',
+          'popularity' => '0',
+          'length' => '282',
+          'trackref' => '1/18',
+          'current' => '0',
+          'started' => '1097377089',
+          'type' => 'read',
+          'rank' => '3.49143'
+        };
+
+    }
+    }
+    return $this->{status}->{$channel} if ($channel);
+    return $this->{status};
+}
+
+sub playing_on {
+    # returns a track object, or undef if no device/channel passed
+    my $this = shift;
+    my $channel = shift;
+
+if (0) {
     return 
     new Thundaural::Client::Track(info=>{
     devicename=>'main',
@@ -420,10 +499,12 @@ sub playing_on {
     current=>((time() - $main::starttime) % 123),
     percentage=>((time() - $main::starttime) % 123) /123
     });
+}
 
     $this->_populate_status();
     if (!$channel) {
-        return $this->{status};
+        croak("no channel passed to playing_on");
+        return undef;
     }
     my $x = $this->{status}->{$channel};
     if (ref($x) eq 'HASH' && $x->{trackref}) {
@@ -459,7 +540,6 @@ sub _populate_queued_on {
             if (!exists($this->{queuedon}->{$dn})) {
                 $this->{queuedon}->{$dn} = [];
             }
-            print Dumper($trkinfo);
             my $trk = new Thundaural::Client::Track(info=>$trkinfo);
             push(@{$this->{queuedon}->{$dn}}, $trk);
         }
@@ -473,10 +553,12 @@ sub queued_on {
     my $this = shift;
     my $channel = shift;
 
+if (0) {
     return [
         $this->playing_on(), $this->playing_on(), $this->playing_on(), $this->playing_on(), $this->playing_on(),
         $this->playing_on(), $this->playing_on(), $this->playing_on(), $this->playing_on(), $this->playing_on()
     ];
+}
 
     croak("must pass channel name to queued_on") if (!$channel);
     $this->_populate_queued_on();
