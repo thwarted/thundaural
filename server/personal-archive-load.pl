@@ -1,0 +1,379 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+
+use File::Basename qw(basename);
+use Data::Dumper;
+use Getopt::Long;
+use Carp qw(cluck);
+#use MP3::Info;
+#use Ogg::Vorbis::Header::PurePerl;
+
+$SIG{__WARN__} = sub { cluck(@_); };
+
+$Data::Dumper::Indent = 0;
+
+my $albumdir;
+my $pattern = '^(.+) - (.+) - (\d+) - (.+)\.mpe?3$';
+my @matchorder = ();
+my $fullpath = 0;
+my $mp3 = 0;
+my $vorbis = 0;
+my $metadata_location = 'filename';
+
+my %options = (
+    'mp3'=>\$mp3,
+    'vorbis'=>\$vorbis,
+    'help'=>\&usage,
+    'pattern=s'=>\$pattern,
+    'matchorder=s'=>\@matchorder,
+    'fullpath!'=>\$fullpath,
+    'metadata=s'=>\$metadata_location,
+);
+
+GetOptions(%options) || &usage;
+
+&validate_options();
+
+foreach my $albumdir (@ARGV) {
+    $albumdir =~ s/\/$//;
+    my @files;
+    if (opendir(DIR, $albumdir)) {
+        @files = sort grep { !/^\./ && -f "$albumdir/$_" } readdir(DIR);
+        closedir DIR;
+    } else {
+        warn("can't opendir $albumdir: $!\n");
+        next;
+    }
+
+    my $allperformers = {};
+    my $allalbums = {};
+    my $albuminfo = {};
+    my $tracks = [];
+    my $totaltime = 0;
+    foreach my $file (@files) {
+        my $track = {};
+        $file = "$albumdir/$file";
+        if ($file =~ m/coverart\.(jpe?g|gif|png)$/i) {
+            print "found cover art file $file\n";
+            $albuminfo->{coverarttemp} = $file;
+            next;
+        }
+        if ($file =~ m/.mpe?3$/ || $file =~ m/.ogg$/) {
+            print "processing $file\n";
+            #print "$file\n";
+
+            my $audioinfo = &get_audio_info($file);
+            #print "\t- AUDI: ".Dumper($audioinfo)."\n";
+
+            my $metadata;
+            if ($metadata_location eq 'tags') {
+                $metadata = &try_tags($file);
+                #print "\t- TAGS: ".Dumper($metadata)."\n";
+            } else {
+                $metadata = &try_filename($file);
+                #print "\t- FLNM: ".Dumper($metadata)."\n";
+            }
+            if ($audioinfo) {
+                $track->{length} = $audioinfo->{length};
+                if ($track->{length} != int($track->{length})) {
+                    $track->{length} = int($track->{length})+1;
+                }
+                if (defined($totaltime)) {
+                    $totaltime += $track->{length};
+                }
+            } else {
+                undef $totaltime;
+            }
+            $track->{tracknum} = $metadata->{TRACKNUM} + 0;
+            $track->{performer} = $metadata->{ARTIST};
+            $track->{performersort} = lc $metadata->{ARTIST};
+            $track->{trackname} = $metadata->{TITLE};
+            $track->{filename} = $file;
+            if ($metadata->{ARTIST}) {
+                $allperformers->{$metadata->{ARTIST}}++;
+            }
+            if ($metadata->{ALBUM}) {
+                $allalbums->{$metadata->{ALBUM}}++;
+            }
+            push(@$tracks, $track);
+        }
+    }
+
+    my @t = sort { $a->{tracknum} <=> $b->{tracknum} } @$tracks;
+    $tracks = \@t;
+
+    $albuminfo->{source} = 'personal archive';
+    $albuminfo->{cddbid} = '';
+    $albuminfo->{cdindexid} = '';
+    my($albumperf, $albumperfsort, $albumname);
+    if (scalar keys %$allperformers > 1) {
+        $albumperf = 'Various Artists';
+        $albumperfsort = lc $albumperf;
+    } else {
+        my @x = keys %$allperformers;
+        $albumperf = shift @x;
+        $albumperfsort = lc $albumperf;
+    }
+    if (scalar keys %$allalbums > 1) {
+        $albumname = join('/', sort keys %$allalbums);
+    } else {
+        my @x = keys %$allalbums;
+        $albumname = shift @x;
+    }
+    $albuminfo->{album} = {performer=>$albumperf, albumname=>$albumname, performersort=>$albumperfsort};
+    $albuminfo->{numtracks} = scalar @$tracks;
+    $albuminfo->{tracks} = $tracks;
+    if (defined($totaltime)) {
+        $albuminfo->{totaltime} = $totaltime;
+    }
+
+    if (!$albumperf || !$albumname) {
+        warn("Unable to find artist or albumname in $albumdir\n");
+        next;
+    }
+
+    my $x = "$albumperf-$albumname";
+    $x =~ s/[^a-z0-9_-]//ig;
+    my $outfile = "$albumdir/thundaural-tracklist-$x.pv";
+    if (open(OUT, ">$outfile")) {
+        local $Data::Dumper::Indent = 2;
+        my $output = Dumper($albuminfo);
+        print OUT $output."\n";
+        close(OUT);
+        print "wrote $outfile\n";
+    } else {
+        warn("unable to write to $outfile: $!\n");
+    }
+}
+
+sub get_mp3_info {
+    my $file = shift;
+    return MP3::Info::get_mp3info($file);
+}
+
+sub get_audio_info {
+    my $file = shift;
+
+    if ($mp3) {
+        my $x = MP3::Info::get_mp3info($file);
+        if ($x) {
+            $x->{length} = $x->{SECS};
+            return $x;
+        }
+    }
+    if ($vorbis) {
+        my $o = new Ogg::Vorbis::Header::PurePerl($file);
+        if ($o) {
+            return $o->info();
+        }
+    }
+    die("unable to get audio info from $file\n");
+    return {length=>-1};
+}
+
+sub try_tags {
+    my $file = shift;
+    my $tagsx;
+
+    if ($mp3) {
+        $tagsx = MP3::Info::get_mp3tag($file);
+        if ($tagsx) {
+            return $tagsx;
+        }
+    }
+    if ($vorbis) {
+        my $o = new Ogg::Vorbis::Header::PurePerl($file);
+        if ($o) {
+            $tagsx = {};
+            my @k = $o->comment_tags();
+            #title=Echoes (Life in the Mines)
+            #artist=Sadorf, Sir NutS
+            #date=2004-09-12
+            #album=Kong in Concert
+            #tracknumber=11
+            
+            foreach my $k (@k) {
+                my $kx = $k;
+                $kx =~ s/^tracknumber$/TRACKNUM/ig;
+                $tagsx->{uc $kx} = join(', ', $o->comment($k));
+            }
+            return $tagsx;
+        }
+    }
+    my $tags = eval {
+        &get_tags($file);
+    } || {};
+    if ($@) {
+        warn($@);
+        return {};
+    }
+    return $tags;
+}
+
+sub get_tags {
+    my $file = shift;
+
+    my $tagmaps = {
+        'TPE1'=>'ARTIST',
+        'TALB'=>'ALBUM',
+        'TIT2'=>'TITLE',
+        'TYER'=>'YEAR',
+        'TRCK'=>'TRACKNUM',
+    };
+
+    open(TAGS, "<$file") || die("unable to open $file: $!\n");
+    my $foundid3v2 = 0;
+    my $tags = {};
+    while(my $line = <TAGS>) {
+        chomp $line;
+        next if(!$foundid3v2 && $line !~ m/^id3v2 tag info/);
+        $foundid3v2 = 1;
+        next if ($line =~ m/^id3v2 tag info/);
+        if (my($tag, $value) = $line =~ m/^(\w\w\w\w) \([^:]*\): (.+)$/) {
+            $value = &trim($value);
+            if ($value) {
+                if (my $tagm = $tagmaps->{$tag}) {
+                    $tags->{$tagm} = $value;
+                }
+            }
+        } else {
+            #die("match failed: $line\n");
+        }
+    }
+# id3v2 tag info for /MP3ARTISTS/REO Speedwagon/REO Speedwagon - Greatest Hits - 04 - Keep On Loving You.mp3:
+# TPE1 (Lead performer(s)/Soloist(s)): Various
+# TALB (Album/Movie/Show title): Music Legends
+# TIT2 (Title/songname/content description): REO Speedwagon / Keep on loving you
+# TYER (Year): 2003
+# MCDI (Music CD identifier):  (unimplemented)
+# TRCK (Track number/Position in set): 4
+# TCON (Content type): Rock (17)
+# TLEN (Length): 201093
+    close(TAGS);
+    return $tags;
+}
+
+sub trim {
+    my $s = shift;
+    $s =~ s/^\s+//;
+    $s =~ s/\s+$//;
+    return $s;
+}
+
+sub try_filename {
+    my $file = shift;
+    if (!$fullpath) {
+        $file = basename($file);
+    }
+    my $v = {};
+    if (my @a = $file =~ m/$pattern/) {
+        #print "\t".Dumper(\@a)."\n";
+        #print "\t".Dumper(\@matchorder)."\n";
+        foreach my $m (@matchorder) {
+            my $a = shift @a;
+            $v->{uc $m} = $a if ($m ne 'undef');
+        }
+    }
+    return $v;
+}
+
+
+sub validate_options {
+    if (! scalar @matchorder) {
+        @matchorder = qw(artist album tracknum title);
+    }
+    @matchorder = split(',', join(',', @matchorder));
+    foreach my $mo (@matchorder) {
+        die("\"$mo\" isn't a valid matchorder compoent\n")
+            if ($mo ne 'artist'
+             && $mo ne 'tracknum'
+             && $mo ne 'title'
+             && $mo ne 'album'
+             && $mo ne 'undef');
+    }
+
+    if ($pattern !~ m/^\^/ || $pattern !~ m/\$$/) {
+        die("pattern must start with ^ and end with \$\n");
+    }
+    eval {
+        my $x = '';
+        $x =~ m/$pattern/;
+    };
+    die("\"$pattern\" doesn't appear to be a valid perl regular expression\n")
+        if ($@);
+
+    if ($metadata_location !~ m/(filename|tags)/) {
+        die("--metadata needs filename or tags argument");
+    }
+
+    if (!$mp3 && !$vorbis && $metadata_location eq 'tags') {
+        $mp3 = 1;
+        $vorbis = 1;
+    }
+
+    if ($mp3) {
+        eval "use MP3::Info;";
+        die($@) if ($@);
+    }
+
+    if ($vorbis) {
+        eval "use Ogg::Vorbis::Header::PurePerl;";
+        die($@) if ($@);
+    }
+}
+
+sub usage {
+print <<"EOF";
+$0 [<option> ...] <directory> ...
+Scans the specifies directories for MP3 and Ogg Vorbis files and prepares a
+data file describing a single album.  This file will have a .pv extension,
+and should be given to the ripdisc.pl script to load the album into the
+database.
+
+Assumes each directory has all the tracks you want grouped on a single album 
+in it.
+
+Recognized options are:
+
+  --metadata <loc>          get metadata from <loc>, where <loc> can be 
+                              "filename" or "tags", default "filename"
+
+For "--metadata filename":
+  --pattern <pat>           perl regex with paren'ed subexpressions
+  --matchorder a,b,c...     the order that the paren'ed subexp in <pat> match 
+                              fields. fields can be 'artist', 'title', 'tracknum', 
+                              and 'album'.  Use 'undef' to specify a regex 
+                              grouping that should be ignored
+  --fullpath                apply the pattern to the entire path
+  --nofullpath              apply the pattern to only the basename (default)
+
+For "--metadata tags":
+  --mp3                     force reading of tags using MP3::Info
+  --vorbis                  force reading of tags using 
+                                            Ogg::Vorbis::Header::PurePerl
+If neither of the above are given, both will be tried.  You can use these
+option to force use of a module and not fail if you don't have the other
+one installed, and all your files are in that format.
+
+For 
+The default pattern is 
+
+  ^(.+) - (.+) - (\\d+) - (.+)\\.mpe?3\$
+
+and is matched case insensitively.
+The default match order, which coincides with the default pattern, is
+
+  artist,album,tracknum,title
+
+If you specify --fullpath, then you have to include prefixing directories in
+the pattern
+
+If there a file named coverart.{gif,png,jpg} in the album directory, that
+file will be used as the coverart for the album.
+
+EOF
+    exit;
+}
+

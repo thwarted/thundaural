@@ -3,6 +3,7 @@
 use strict;
 use warnings;
 
+use Carp qw(cluck);
 use Data::Dumper;
 use Getopt::Long;
 use File::Glob ':glob';
@@ -15,6 +16,8 @@ BEGIN {
     open(STDERR, '>&=STDOUT');
 }
 
+$SIG{__WARN__} = sub { cluck(@_); };
+
 # order is important here.  They'll be queried in the order specified
 # and the first one to succeed will be used.
 my $cdinfo_modules = ['MusicBrainzRemote', 'FreeDB'];
@@ -23,6 +26,7 @@ my $sx = {};
 my $taversion = "Thundaural v1.5 Audio Ripper";
 my $accepteddbversion = 5;
 my $bin_getcoverart = './getcoverart.php';
+my $preripped = 0;
 
 use Thundaural::Util;
 use DBI;
@@ -30,9 +34,11 @@ my $dbh;
 
 &parse_command_line(@ARGV);
 &verify_settings;
-&cleanup;
 
-{
+# it would be really cool to allow manually creating 
+# a metadata file but read the audio from a physical CD
+if ($sx->{cddevice} && !$sx->{infofile}) {
+    &cleanup;
     my $cdinfo = &get_audiocd_info;
 
     if (!defined($cdinfo)) {
@@ -54,7 +60,7 @@ my $dbh;
     my($catemp, $coverartfile) = &get_cover_art($cdinfo);
     $cdinfo->{coverarttemp} = $catemp;
     $cdinfo->{coverartfile} = $coverartfile;
-    &dump_discinfo($cdinfo, '2coverart');
+    &dump_discinfo($cdinfo, '2artwork');
 
     my $ripstart = time();
     &rip_tracks($cdinfo);
@@ -68,6 +74,63 @@ my $dbh;
         &dumpstatus('idle', sprintf('ripping "%s - %s" successful', $cdinfo->{album}->{performer}, $cdinfo->{album}->{albumname}));
     }
 }
+
+if ($sx->{infofile} && !$sx->{cddevice}) {
+    $preripped = 1;
+    $sx->{cddevice} = "local";
+    if (!open(X, "<".$sx->{infofile})) {
+        die("unable to read ".$sx->{infofile}.": $!\n");
+    }
+    my $pv = join('', <X>); 
+    close(X);
+    my $cdinfo = eval "return my $pv;";
+    if ($@) {
+        die("unable to read ".$sx->{infofile}.": $@\n");
+    }
+    print Dumper($cdinfo);
+
+    # do we already have this album ?
+    # this will most likely not do anything, because preripped
+    # tracks won't have cdindex or cddbid info, they didn't
+    # necessarily come from a physical album
+    if (&already_have_album($cdinfo)) {
+        &dumpstatus('idle', sprintf('already have album %s - %s', $cdinfo->{album}->{performer}, $cdinfo->{album}->{albumname}));
+        exit;
+    }
+
+    my $cadir = sprintf('coverart/%s', &get_sort_dir($cdinfo->{album}->{performersort}));
+    mkdir(sprintf('%s/coverart', $sx->{storagedir}), 0777);
+    mkdir(sprintf('%s/%s', $sx->{storagedir}, $cadir), 0777);
+    # assume the extension is correct here
+    my($ext) = $cdinfo->{coverarttemp} =~ m/\.(\w+)$/;
+    $cdinfo->{coverartfile} = sprintf('%s/%s - %s - %d - coverart.%s', 
+            $cadir,
+            $cdinfo->{album}->{performer}, 
+            $cdinfo->{album}->{albumname},
+            $$, # some level of uniqueness
+            $ext
+    );
+    $cdinfo->{riptime} = 0;
+    foreach my $track (@{$cdinfo->{tracks}}) {
+        my $artist = $track->{performer};
+        if ($cdinfo->{album}->{performer} =~ m/various artists/i) {
+            $artist = "(Various Artists) $artist";
+        }
+        my $album = $cdinfo->{album}->{albumname};
+        my $tracknum = $track->{tracknum};
+        my $title = $track->{trackname};
+        $track->{sortdir} = &get_sort_dir($artist);
+        $track->{finalfilename} = sprintf("%s :: %s :: %02d :: %s.ogg", &unslash($artist), &unslash($album), $tracknum, &unslash($title));
+    }
+    my $failed = &add_album($cdinfo);
+    if ($failed) {
+        print "unable to add album: $failed\n";
+    } else {
+        print sprintf("successfully added album %s - %s\n", $cdinfo->{album}->{performer}, $cdinfo->{album}->{albumname});
+    }
+}
+
+$dbh->disconnect;
 
 sub dump_discinfo {
     my $cdinfo = shift;
@@ -134,7 +197,7 @@ sub add_album {
         # do the cover art
         if (-s $cdinfo->{coverarttemp}) {
             my $newcafile = sprintf('%s/%s', $sx->{storagedir}, $cdinfo->{coverartfile});
-            if (!(rename($cdinfo->{coverarttemp}, $newcafile))) {
+            if (!(&move_file($cdinfo->{coverarttemp}, $newcafile))) {
                 $failed = "renaming cover art failed: $!";
                 last TRANSACTION;
             } else {
@@ -177,7 +240,7 @@ sub add_album {
                 $failed = "renaming track to existing file";
                 last TRANSACTION;
             }
-            if (!(rename($track->{filename}, $newfile))) {
+            if (!(&move_file($track->{filename}, $newfile))) {
                 $failed = "file rename failed: $!";
                 last TRANSACTION;
             }
@@ -215,14 +278,14 @@ sub add_album {
         last TRANSACTION; # we only want to execute this loop once
     }
 
-    if (!$trackcount) {
+    if (!$trackcount && !$failed) {
         $failed = "no tracks were ripped";
     }
 
     if ($failed) {
         $dbh->rollback();
         foreach my $utr (keys %{$undorenames}) {
-            rename $utr, $undorenames->{$utr};
+            &undo_move_file($utr, $undorenames->{$utr});
         }
         return $failed;
     } else {
@@ -231,7 +294,36 @@ sub add_album {
     }
 }
 
-$dbh->disconnect;
+sub move_file {
+    my $src = shift;
+    my $dest = shift;
+
+    if ($preripped) {
+        if (open(S, "<$src")) {
+            if (open(D, ">$dest")) {
+                my $buf = '';
+                while(read(S, $buf, 8192)) {
+                    print D $buf;
+                }
+                close(D);
+            }
+            close(S);
+        }
+    } else {
+        return rename($src, $dest);
+    }
+}
+
+sub undo_move_file {
+    my $src = shift;
+    my $dest = shift;
+
+    if ($preripped) {
+        return unlink($src);
+    } else {
+        return rename $src, $dest;
+    }
+}
 
 sub get_cover_art {
     my $cdinfo = shift;
@@ -239,14 +331,14 @@ sub get_cover_art {
     my $catemp = Thundaural::Util::mymktempname(
         $sx->{storagedir},
         $sx->{cddevice},
-        sprintf('disc%s.coverart.jpg', $cdinfo->{cddbid})
+        sprintf('disc%s.coverart.image', $cdinfo->{cddbid})
     );
 
     #$coverartfile = sprintf("coverart/$sortdir/$artist - $albumtitle - $cddbid - coverart.jpg";
     my $cadir = sprintf('coverart/%s', &get_sort_dir($cdinfo->{album}->{performersort}));
     mkdir(sprintf('%s/coverart', $sx->{storagedir}), 0777);
     mkdir(sprintf('%s/%s', $sx->{storagedir}, $cadir), 0777);
-    my $coverartfile = sprintf('%s/%s - %s - %s - coverart.jpg', 
+    my $coverartfile = sprintf('%s/%s - %s - %s - coverart.image', 
             $cadir,
             $cdinfo->{album}->{performer}, 
             $cdinfo->{album}->{albumname},
@@ -261,10 +353,38 @@ sub get_cover_art {
     &dumpstatus('busy', "finding cover art for \"$artist - $albumtitle\"");
     system($cmd);
 
+    # ensure the file exists
     open(W, ">>$catemp");
     close(W);
 
+    if (my $ext = &determine_extension($catemp)) {
+        my $oldtemp = $catemp;
+        $catemp =~ s/\.image$/.$ext/;
+        $coverartfile =~ s/\.image$/.$ext/;
+        rename $oldtemp, $catemp;
+    }
+
     return ($catemp, $coverartfile);
+}
+
+sub determine_extension {
+    my $file = shift;
+    # let's not rely on an external program here, just read the magic
+    # 0000000 211   P   N   G  \r  \n 032  \n  \0  \0  \0  \r   I   H   D   R
+    # 0000000   G   I   F   8   9   a   $  \0   ;  \0 367  \0  \0 377 377 377
+    # 0000000 377 330 377 340  \0 020   J   F   I   F  \0 001 002  \0  \0   d
+    if (open(F, "<$file")) {
+        my $buf = '';
+        my $res = sysread(F, $buf, 16, 0);
+        if ($res && $res == 16) {
+            # luckily the format for all three of these can be determined 
+            # from the first 16 bytes
+            return 'png' if ($buf =~ m/PNG/i);
+            return 'gif' if ($buf =~ m/GIF/i);
+            return 'jpg' if ($buf =~ m/JFIF/i);
+        }
+    }
+    return undef;
 }
 
 sub performer_id {
@@ -329,7 +449,7 @@ sub already_have_album {
     my($id, $albumid, $e);
 
     # check cdindexid
-    if (defined($id = $cdinfo->{cdindexid})) {
+    if (defined($id = $cdinfo->{cdindexid}) && $cdinfo->{cdindexid}) {
         my $q = "select albumid from albums where cdindexid = ? limit 1";
         my $sth = $dbh->prepare($q);
         eval {
@@ -343,7 +463,7 @@ sub already_have_album {
     return $albumid if ($albumid);
 
     # check cddbid
-    if (defined($id = $cdinfo->{cddbid})) {
+    if (defined($id = $cdinfo->{cddbid}) && $cdinfo->{cddbid}) {
         my $q = "select albumid from albums where cddbid = ? limit 1";
         my $sth = $dbh->prepare($q);
         eval {
@@ -418,7 +538,7 @@ sub rip_tracks {
                 $pct = int($pct);
                 if ($pct ne $oldpct) {
                     my $speed = &calc_speed($tracklen, $startat, $pct);
-                    &dumpstatus('ripping', '', "$tracknum/$totaltracks", $artist, $title, 0, $speed, $tracklen, '?', $startat, 0, $pct);
+                    &dumpstatus('ripping', '', "0/$tracknum", $artist, $title, 0, $speed, $tracklen, $totaltracks, $startat, 0, $pct);
                     $oldpct = $pct;
                 }
             }
@@ -441,16 +561,40 @@ sub unslash {
 sub parse_command_line {
     $sx->{output} = "text";
     my %options = (
+        'help'=>\&usage,
         'output=s'=>\($sx->{output}),
         'prog=s'=>\&set_prog,
         'device=s'=>\($sx->{cddevice}),
         'storagedir=s'=>\($sx->{storagedir}),
-        'dbfile=s'=>\($sx->{dbfile})
+        'dbfile=s'=>\($sx->{dbfile}),
+        'infofile=s'=>\($sx->{infofile})
     );
     &mydie("invoked with invalid arguments")
         unless GetOptions(%options);
     &mydie("'storable' and 'text' are the only allowed arguments to output\n")
         if ($sx->{output} !~ m/^(storable|text)$/);
+}
+
+sub usage {
+    print STDERR <<"EOF";
+$0 <option> ...
+  --help           print help message
+  --output <t>     format to output status messages, "text" or 
+                    "storable" (perl)
+  --prog name:path set the program name to path
+  --storagedir     the thundaural storage directory
+  --dbfile         the thundaural database file
+
+The following two options are mutually exclusive:
+  --device <d>     use cdrom device <d>, read data from physical
+                    media
+  --infofile <f>   read album/track info from file <f>. don't rip 
+                    from physical media. the file should be 
+                    generated with another, related utility and
+                    should contain all the metadata and audio
+                    file location information
+EOF
+    exit;
 }
 
 sub set_prog {
@@ -470,9 +614,17 @@ sub verify_settings {
             -r $sx->{storagedir} &&
             -w $sx->{storagedir});
 
-    &mydie("missing --device argument\n") unless ($sx->{cddevice});
-    &mydie("specified cdrom device (".$sx->{cddevice}.") is not readable\n")
-        unless (-r $sx->{cddevice});
+    if (!$sx->{infofile}) {
+        &mydie("missing --device argument\n") unless ($sx->{cddevice});
+        &mydie("specified cdrom device (".$sx->{cddevice}.") is not readable\n")
+            unless (-r $sx->{cddevice});
+        $sx->{devname} = $sx->{cddevice};
+        $sx->{devname} =~ s/\W/_/g;
+        $sx->{devname} =~ s/_+/_/g;
+    }
+    if (!$sx->{cddevice}) {
+        &mydie("unable to find ".$sx->{infofile}."\n") unless (-s $sx->{infofile});
+    }
 
     &mydie("missing --dbfile argument\n") unless ($sx->{dbfile});
     &mydie("database (".$sx->{dbfile}.") doesn't exist\n") unless (-e $sx->{dbfile});
@@ -497,9 +649,6 @@ sub verify_settings {
 
     #$dbh->trace(2);
 
-    $sx->{devname} = $sx->{cddevice};
-    $sx->{devname} =~ s/\W/_/g;
-    $sx->{devname} =~ s/_+/_/g;
 }
 
 sub get_audiocd_info {
@@ -619,7 +768,7 @@ sub get_sort_dir {
     my $a = shift;
 
     $a =~ s/^\s+//;
-    $a =~ s/^(An?\W|The\W|\W+)//i;
+    $a =~ s/^(An?\W+|The\W+|\W+)//i;
     ($a) = $a =~ m/^(\w)/;
     $a = lc $a;
     $a = 'x' if (!$a);

@@ -1,0 +1,187 @@
+You can now populate the Thundaural jukebox database with audio tracks from 
+your own personal collection rather than having to rip physical CDs.
+
+For each album, the process is three steps:
+
+  1. clean up the metadata on your audio files and acquire a cover art image.
+     The Thundaural jukebox interface is highly interactive, so having 
+     accurate metadata and good information about the tracks will make it 
+     easier for users to find them.  You have two options:
+        - this could be as simple as renaming all the files and arranging them
+          in subdirectories by album.  The filenames should include the
+          artist/performer, the album name, the track number and the song
+          title.
+        - a more involved, but possibly more accurate method, is to set the
+          audio file tags (id3v1, id3v2, ogg comments) to the necessarily
+          information.  You can use a program like the MusicBrainz Tagger 
+          (www.musicbrainz.org unfortunately only runs on Windows or OSX) or 
+          some other automated tagging application.  I'm sure there are a 
+          number of them listed on freshmeat.net.  Often times, audio files
+          you purchase on-line will already have accurate metadata tags,
+          although you may need to convert from the lame propritary lock-in
+          formats like AAC (iTunes Music Store) to a format that Thundaural
+          can play (MP3 or Vorbis).  Hopefully, that conversion process will
+          copy any tags to the new file.  Actually setting the tags is beyond
+          the scope of this document and this utility.
+     this is, most likely, the most involved step.
+
+  2. use the server/personal-archive-load.pl script to generate a
+     Thundaural-specific metadata file for each album.  In most cases, this is
+     simply a matter of giving this script the directory that contains the
+     tracks.  It will generate a .pv file.
+
+  3. feed the .pv file to the server/ripdisc.pl script, which will populate
+     the database and copy the audio files and cover art to the correct place
+     so the Thundaural jukebox server can access them.
+
+Let's go over an example.  I recently downloaded the "Kong in Concert: Donkey
+Kong Country Arrangement Collaboration" from http://dkcproject.ocremix.org.  I
+want to add these tracks to my jukebox.  I made a directory (~/kongalbum) to
+store all the tracks in this new album and put the files in it (I had 
+previously converted the files from .wav to Ogg Vorbis before starting this):
+
+Kong in Concert - 01 - Israfel - Godiva in the Desert (Theme).ogg
+Kong in Concert - 02 - Hemophiliac - Swing, Monkey, Swing (Simian Segue).ogg
+Kong in Concert - 03 - JigginJonT - West Coast DK Island (DK Island Swing).ogg
+Kong in Concert - 04 - Unknown - Rest and (Re)spite on a Soft Summer Night
+(Cranky's Theme).ogg
+Kong in Concert - 05 - Adhesive_Boy - Cry of the Chasmal Critter Chain (Cave
+Dweller Concert).ogg
+Kong in Concert - 06 - Icy Guy - One Zero One (Bonus Room Blitz).ogg
+Kong in Concert - 07 - Vigilante - Beneath the Surface (Aquatic Ambiance).ogg
+Kong in Concert - 08 - Vigilante - Funky Monkey Love (Candy's Love Song).ogg
+Kong in Concert - 09 - Red Omen, Protricity - Boiling Point (Bad Boss
+Boogie).ogg
+Kong in Concert - 10 - Protricity - Mine Cart Misadventure (Mine Cart
+Madness).ogg
+Kong in Concert - 11 - Sadorf, Sir NutS - Echoes (Life in the Mines).ogg
+Kong in Concert - 12 - GrayLightning - Idols of Hanuman (Voices of the
+Temple).ogg
+Kong in Concert - 13 - zircon - Faunaphonic (Forest Frenzy).ogg
+Kong in Concert - 14 - smh - Arboreal Ascent (Treetop Rock).ogg
+Kong in Concert - 15 - bLiNd - Aerofunknamics (Funky's Fugue).ogg
+Kong in Concert - 16 - Aetherius - Clouded Mind and Ringing Ears (Misty
+Menace).ogg
+Kong in Concert - 17 - Prophecy - Chekan Winter (Northern Hemispheres).ogg
+Kong in Concert - 18 - analoq - dolilop do wop (Ice Cave Chant).ogg
+Kong in Concert - 19 - GrayLightning - Machina Anesthesia (Fear Factory).ogg
+Kong in Concert - 20 - Dhsu - Pirate Prelude (Gang-Plank Galleon Pt 1).ogg
+Kong in Concert - 21 - SnappleMan - Thrash the Plank (Gang-Plank Galleon Pt
+2).ogg
+Kong in Concert - 22 - Protricity - Rare Reminiscence (The Credits
+Concerto).ogg
+
+Twenty-two tracks.  Note that even though the download of this album is
+arranged in such a way as to suggest it is two physical CDs, I wanted to have
+all the tracks appear on one album in my jukebox.  So I just put all the files
+in the same directory.  You do not need to arrange all the albums in your
+jukebox the same way the music comes off a physical CD; you can mix and match
+tracks from different albums how ever you like.  But keep in mind that
+Thundaural jukebox is designed to work similar to a real jukebox, and mixing
+and matching tracks from different albums will make it difficult to
+find/create appropriate cover art, and can make it difficult for people to
+find certain tracks when browsing.  I would suggest against making playlists
+using the album metaphor in this case.  Album arrangment of tracks will make
+it easy to find tracks within the system.  Order of play is outside of that,
+and can be chosen via the interface (just like a regular jukebox).
+
+There are multiple images that can be used to make the jewel case jacket and
+inserts for "Kong in Concert", and Thundaural can use more than one image, but
+I just picked a single image (from their download collection).  Put this image
+in the same directory with the tracks and name it coverart.ext.  It can be a
+JPEG, GIF or PNG image, so ext may vary.  The basename of the file should be
+"coverart" though, so the script can find it easily.
+
+coverart.png
+
+So now the directory for this example contains 23 files.  22 tracks and 1
+image.
+
+Now, I run the personal-archive-load.pl script and give it the name of
+directory that contains the tracks:
+
+./personal-archive-load.pl --metadata filename \
+   ~/kongalbum \
+   --pattern '^(.+) - (\d+) - (.+) - (.+).ogg$' \
+   --matchorder album,tracknum,artist,title
+
+This says to use the filename to find metadata, the filename should match the
+specified regular expression and the parenethesied sub-expressions of the
+regular expression give the values for, in order, the album name, the
+tracknumber, the artist and the track title.  For these "Kong in Concert"
+tracks, I needed to specify pattern and match order because the format of the
+filenames is different than the default (see the --help option for the
+default).  
+
+The regular expression must start and end with the anchors ^ and $.
+
+In some cases, the album or artist name may be part of the parent directory
+structure.  In that case, use --fullpath to have the regular expression
+applied to the full path of the file (as given relative to the path specified
+on the command line).  For example, if you have a directory structure like:
+
+The Beatles
+    Revolver
+        01 Taxman.mp3
+        02 Eleanor Rigby.mp3
+        03 I'm Only Sleeping.mpg
+        04 Love You To.mp3
+        ...
+
+and thus one of the filenames, with path, is:
+
+~/music/The Beatles/Revolver/03 Eleanor Rigby.mp3
+
+Then specify --fullpath and 
+
+ --patern '^.+/([^/]+)/([^/]+)/(\d\d) (.+).mp3$'
+                ^^^^^   ^^^^^   ^^^^   ^^
+
+(I've used carets to point out each sub-expression) and for match order, 
+give it:
+
+ --matchorder artist,album,tracknum,title
+
+The regular expression can be as complex as you like.  If a subexpression
+shouldn't match any of the four fields listed above, you should specify
+"undef" in the position of that subexpression.
+
+If you use the "--metadata tags" option, --pattern and --matchorder isn't
+necessary, as the fields will be attempted to be read from the tags in the
+files.
+
+So the personal-archive-load.pl script created a .pv file in the ~/kongalbum
+directory.  You should look over this file to make sure everything checks out.
+You can make changes, but it might be good if you knew perl syntax so the file
+is readable.  If 
+If you had elected to
+
+Note that if you run personal-archive-load.pl multiple times and it finds
+different metadata, you might end up with multiple files because the filename
+contains the artist and album name it found.
+
+You can now feed the .pv file to the ripdisc.pl script, to get the files 
+copied to the correct place and the database to be loaded.  Usually this 
+script is invoked by the server to rip a physical CD, but in this case we'll
+invoke it ourselves on the command line:
+
+./ripdisc.pl --infofile X.pv --storagedir SD --dbfile DBF
+
+where:
+  X.pv is the file written by the personal-archive-load.pl script
+  SD   is the storage directory (usually /home/storage)
+  DBF  is the path to the database file (usually /home/storage/db/data.db)
+
+The ripdisc.pl script currently does not read the thundural-server.conf file
+for these values (that'll be in an upcoming version) so you'll need to specify
+them yourself.
+
+It should dump a bunch of stuff out and populate the database.
+
+And that's it.  These tracks should now be accessible from the server (and
+thus from the client) and be available for playing.
+
+If no coverart file is found in the album directory, it will not add coverart
+to the database.  In this case, you can use the album-images.pl script to
+manlipulate cover art once the tracks are loaded.
+
