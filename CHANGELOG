@@ -12,7 +12,14 @@ changes from version 1.7 to 2.0
   different themes can be created without interfering with the base, original
   theme
 
-- 
+- server detects inaccessiblity of the various devices it interacts with and
+  will refuse to start up if it they are not accessible, rather than going into
+  a state where it looks like it's working but doesn't
+
+- fixed default -w option to aumix in the conf file checkdeps generates
+
+- code should be self-contained now -- that is, no longer need to copy things
+  to elsewhere in the filesystem to get it to work
 
 
 changes from version 1.6 to version 1.7
