@@ -78,7 +78,9 @@ sub set_track {
     my @numtext = ();
     my $toffset = $track->trackref();
     $toffset =~ s!^\d+/!!g;
-    push(@tracktext, $track->name());
+    my $tn = $track->name();
+    $tn =~ s/`/'/g;
+    push(@tracktext, $tn);
     my $trackperformer = $track->performer();
     push(@tracktext, $trackperformer) if ($trackperformer ne $albumperformer);
     my $vert = 0;
@@ -130,7 +132,7 @@ sub onClick {
     my $dev = $main::client->devices('play');
     my $playon = shift @$dev;
     logger('requesting track %s on %s', $this->{track}->trackref(), $playon);
-    $main::client->play($this->{track}->trackref(), $playon);
+    $this->{track}->play($playon);
     $main::theme->show_page('NowPlayingPage');
 }
 

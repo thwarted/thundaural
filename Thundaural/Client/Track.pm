@@ -44,6 +44,13 @@ sub tohash {
     return $this->{info};
 }
 
+sub play {
+    my $this = shift;
+    my $channel = shift;
+
+    $main::client->play($this->trackref(), $channel);
+}
+
 sub AUTOLOAD {
     my $this = shift;
 
