@@ -26,8 +26,11 @@ sub widget_initialize {
     my $area = new SDL::Rect(-width=>72, -height=>72, -x=>80, -y=>450);
     $this->area($area);
 
-    $this->set_frame(file=>'images/button-pause-raised.png', resize=>0);
-    $this->set_depressed_frame(file=>'images/button-pause-depressed.png', resize=>0);
+    $this->add_frame(file=>'images/button-pause-raised.png', resize=>0);
+    $this->add_depressed_frame(file=>'images/button-pause-depressed.png', resize=>0);
+
+    $this->add_frame(file=>'images/button-play-raised.png', resize=>0);
+    $this->add_depressed_frame(file=>'images/button-play-depressed.png', resize=>0);
 
     $this->SUPER::widget_initialize();
 }
@@ -35,7 +38,13 @@ sub widget_initialize {
 sub onClick {
     my $this = shift;
 
-    logger($this->name()." was hit");
+    my $dev = $main::client->devices('play');
+    my $pauseon = shift @$dev;
+    logger('requesting pause of %s', $pauseon);
+    $main::client->pause($pauseon);
+
+    my $nf = $this->frame();
+    $this->frame($nf ? 0 : 1);
 }
 
 1;

@@ -127,7 +127,11 @@ sub set_track {
 sub onClick {
     my $this = shift;
 
-    logger('track %s was selected', $this->{track}->trackref());
+    my $dev = $main::client->devices('play');
+    my $playon = shift @$dev;
+    logger('requesting track %s on %s', $this->{track}->trackref(), $playon);
+    $main::client->play($this->{track}->trackref(), $playon);
+    $main::theme->show_page('NowPlayingPage');
 }
 
 1;
