@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-# $Header: /home/cvs/thundaural/client/interface.pl,v 1.7 2004/01/08 08:20:46 jukebox Exp $
+# $Header: /home/cvs/thundaural/client/interface.pl,v 1.8 2004/01/09 05:54:07 jukebox Exp $
 
 use strict;
 use warnings;
@@ -55,7 +55,6 @@ use ClientCommands;
 use Track;
 use Albums;
 use Album;
-use Status;
 
 # interface related stuff
 use EventReceiver;

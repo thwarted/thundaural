@@ -364,14 +364,14 @@ sub cycle_outputs {
 
 sub sectotime {
 	my $this = shift;
-	my $sec = shift;
-	my $short = shift;
-		                                                                                                                                                                                                                                           
+	my $sec = shift || 0;
+	my $short = shift || 0;
+
 	my $min = int($sec / 60);
 	$sec = $sec % 60;
 	my $hrs = int($min / 60);
 	$min = $min % 60;
-		                                                                                                                                                                                                                                           
+
 	if ($short) {
 		my @ret = ();
 		push(@ret, $hrs) if ($hrs);
