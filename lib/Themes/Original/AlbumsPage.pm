@@ -21,6 +21,7 @@ use Themes::Original::AlbumPrev;
 use Themes::Original::AlbumNext;
 use Themes::Original::AlbumSelect;
 use Themes::Original::AlbumSlider;
+use Themes::Original::AlbumGoto;
 
 sub widget_initialize {
     my $this = shift;
@@ -30,6 +31,7 @@ sub widget_initialize {
     $this->add_widget(new Themes::Original::AlbumPrev(name=>'albumprev'));
     $this->add_widget(new Themes::Original::AlbumNext(name=>'albumnext'));
     $this->add_widget(new Themes::Original::AlbumSlider(name=>'albumslider'));
+    $this->add_widget(new Themes::Original::AlbumGoto(name=>'albumgoto'));
 
     $this->{album_offset} = 0;
 
@@ -86,6 +88,7 @@ sub adjust_album_offset {
     my $change = $o{change};
     my $pct = $o{percentage};
     my $page = $o{page};
+    my $letter = $o{letter};
 
     my $offset = $this->{album_offset};
     my $ooffset = $offset;
@@ -99,8 +102,11 @@ sub adjust_album_offset {
         $offset += ($this->{albums_per_page} * $page);
     } elsif (defined($pct)) {
         $offset = int($total * $pct);
+    } elsif (defined($letter)) {
+        logger("adjusting to $letter");
+        $offset = $main::client->album_offset_from_prefix(letter=>$letter);
     } else {
-        croak("adjust_album_offset(change=>INT, percentage=>FLOAT, page=>INT)");
+        croak("adjust_album_offset(change=>INT, percentage=>FLOAT, page=>INT, letter=>LETTER)");
     }
     my $max = $total - $this->{albums_per_page};
     $offset = $max if ($offset > $max);
@@ -119,8 +125,11 @@ sub adjust_album_offset {
         if ($pct < (1 / $total)) {
             $pct = 0;
         }
+        my $xp;
         $this->get_widget('albumslider')->percent_full($pct);
-        logger("album offset is $offset");
+        $this->get_widget('albumgoto')->percent_full($xp = $main::client->album_prefix_percentage_from_offset(offset=>$offset));
+        my $p = $main::client->album_prefix_from_offset(offset=>$offset);
+        logger("album offset is $offset, prefix $p, pct $xp");
     }
 }
 

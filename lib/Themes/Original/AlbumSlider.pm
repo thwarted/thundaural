@@ -13,7 +13,7 @@ use base 'Widget::ProgressBar';
 sub widget_initialize {
     my $this = shift;
 
-    my $area = new SDL::Rect(-x=>52+95+20, -y=>768-32-40, -width=>877-20-(52+95+20), -height=>40);
+    my $area = new SDL::Rect(-x=>52+95+20, -y=>768-32-60, -width=>877-20-(52+95+20), -height=>40);
     $this->area($area);
 
     $this->bgcolor(new SDL::Color(-r=>140, -g=>140, -b=>140));
