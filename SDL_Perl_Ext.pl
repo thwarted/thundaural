@@ -122,9 +122,16 @@ sub print_lines_justified {
         if ($l =~ m/^\s*$/) { $l = ' '; };
         if ($l =~ m/\s/) {
             # only try to truncate if there is whitespace to divide the string by
+            my $loops = 0;
+            my $ol = $l;
             while ($trunc && $maxwidth && ($w = $this->width($l)) > $maxwidth) {
                 $l =~ s/\s+\S+\s*$//;
                 $l .= '...';
+                $loops++;
+                if ($loops > 10) {
+                    logger('unable to truncate "%s"', $ol);
+                    last;
+                }
             }
         }
         $w = $this->width($l);
@@ -142,8 +149,10 @@ sub print_lines_justified {
 
 sub wrap {
     my $this = shift;
-    my $rect = shift;
-    my @lines = @_;
+    my %o = @_;
+    my $rect = $o{rect};
+    my @lines = @{$o{lines}};
+    my $donttruncate = $o{donttruncate};
     my @ret = ();
 
     my $maxlines = int($rect->height() / $this->height());
@@ -158,9 +167,16 @@ sub wrap {
             $l1 = $lx if ($lx);
             $l2 = "$lastword$space$l2" if ($lastword);
         }
-        unshift(@lines, $l2) if ($l2);
         push(@ret, $l1);
-        last if ((scalar @ret) >= $maxlines);
+        if ((my $x = (scalar @ret)) >= $maxlines) {
+            if ($l2 && $donttruncate) {
+                $ret[$x-1] .= " $l2";
+            }
+            last;
+        } else {
+            unshift(@lines, $l2) if ($l2);
+        }
+        #last if ((scalar @ret) >= $maxlines);
     }
     #my $padded = 0;
     #while ((scalar @ret) < $maxlines)) {
