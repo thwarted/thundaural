@@ -49,20 +49,11 @@ sub mainloop {
                 -flags=>SDL::SDL_DOUBLEBUF | SDL::SDL_HWSURFACE | SDL::SDL_HWACCEL);
     die("creation of SDL::App failed") if (!$app);
 
-    $client = new Thundaural::Client::Interface(host=>'localhost', port=>9000, errorfunc=>\&error_message);
+    $client = new Thundaural::Client::Interface(host=>'jukebox', port=>9000, errorfunc=>\&error_message);
 
     $theme = new Themes::Original;
     $theme->start();
     $theme->draw_background(canvas=>$app, source=>new SDL::Rect(-width=>$app->width(), -height=>$app->height() ));
-
-    my $al = $client->albums(offset=>0, count=>3);
-    foreach my $a (@$al) {
-        print "Album : ".$a->albumid()."\n";
-        print "Name  : ".$a->name()."\n";
-        print "Perf  : ".$a->performer()."\n";
-        print "Tracks: ".$a->tracks()."\n";
-        print(("-"x50)."\n");
-    }
 
     #my $x = new SDL::Surface(-name=>'./images/1024x768-Appropriately-Left-Handed-1.png');
     #$x->display_format();
@@ -113,6 +104,7 @@ sub mainloop {
                     last if ($key eq 'q');
                     $app->fullscreen if ($key eq 'f');
                     if ($key eq 'r') {
+                        logger("clearing client cache");
                         $client->clear_cache();
                     }
                 }
