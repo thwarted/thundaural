@@ -26,6 +26,7 @@ use Thundaural::Client::Interface;
 use Themes::Original;
 
 our $tmpdir = "/tmp/newclient-cache-$$";
+our $starttime = time();
 mkdir $tmpdir, 0700;
 
 END { my $x = $?; if ($tmpdir && -d $tmpdir) { `/bin/rm -rf $tmpdir`; } $? = $x; }
