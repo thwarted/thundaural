@@ -65,8 +65,6 @@ sub new {
 	$this->{-albums} = $o{-albums}; # new Albums(-server=>$this->{-server});
 	die("passed argument for -albums not an Album object") if (!ref($this->{-albums}) && !$this->{-albums}->isa('Albums'));
 
-	$this->{-layout} = new Layout(-server=>$this->{-server});
-
 	$this->{-imgsurfaces}->{arrow_down_white} = new SDL::Surface(-name=>'./images/arrow-down-white.png');
 	$this->{-imgsurfaces}->{arrow_down_red} = new SDL::Surface(-name=>'./images/arrow-down-red.png');
 	$this->{-imgsurfaces}->{arrow_up_white} = new SDL::Surface(-name=>'./images/arrow-up-white.png');
@@ -94,7 +92,7 @@ sub _make {
 			-canvas=>$this->{-canvas},
 			-mask=>new SDL::Rect(-width=>150, -height=>50, -x=>10, -y=>400)
 			);
-	my $outputs = $this->{-layout}->outputs();
+	my $outputs = $this->{-server}->devices('play');
 	my $first;
 	foreach my $o (@$outputs) {
 		my $x = new SDL::Surface(-width=>150, -height=>50);
@@ -108,7 +106,7 @@ sub _make {
 		$first = $o if (!$first);
 	}
 	$output->on_interior_event(SDL::SDL_MOUSEBUTTONDOWN, sub {
-			$this->{-channel} = $this->{-layout}->cycle_outputs($this->{-channel});
+			$this->{-channel} = $this->cycle_outputs($this->{-channel});
 			$output->draw($this->{-channel});
 			Logger::logger("will queue new tracks on %s", $this->{-channel});
 		} );
@@ -349,6 +347,21 @@ sub _make_album_cover($) {
 	return $x;
 }
 
+sub cycle_outputs {
+	my $this = shift;
+	my $cur = shift;
+
+	my $o = $this->{-server}->devices('play');
+	my $out = [ @$o, @$o ]; # last + 1 will now equal first
+	my $ret;
+	my $takenext = 0;
+	foreach my $o (@$out) {
+		return $o if ($takenext);
+		$takenext = 1 if ($o eq $cur);
+	}
+	return $out->[0];
+}
+
 sub sectotime {
 	my $this = shift;
 	my $sec = shift;
@@ -390,6 +403,10 @@ sub english_rank {
 	return "eighth" if ($rank == 8);
 	return "ninth" if ($rank == 9);
 	return "tenth" if ($rank == 10);
+	return "eleventh" if ($rank == 11);
+	return "twelveth" if ($rank == 12);
+	return "thirteenth" if ($rank == 13);
+	return "fourteenth" if ($rank == 14);
 	return $rank."st" if ($rank =~ m/1$/);
 	return $rank."nd" if ($rank =~ m/2$/);
 	return $rank."rd" if ($rank =~ m/3$/);

@@ -1,0 +1,61 @@
+
+changes from version 1.0 to version 1.1
+
+- database change: new colum tracks.riperrors which ripdisc.pl will 
+  record how many corrections cdparanoia claims it had to make.  In 
+  the future this will be used to help determine if any tracks need 
+  to be re-ripped or replaced.  cdparanoia is excellent at error 
+  correction, but sometimes leaves pops and skip noises in the audio.
+  You'll need to modify the tracks table by hand to add this colum:
+  in SQLite (which doesn't have alter or rename statements):
+      create table oldtracks as select * from tracks;
+      .schema tracks
+      drop tracks;
+      CREATE TABLE tracks (
+        trackid integer,
+        albumid int(11) NOT NULL default '0',
+        performer varchar(128) NOT NULL default '',
+        length int(11) default NULL,
+        name varchar(128) NOT NULL default '',
+        albumorder int(11) NOT NULL default '0',
+        genreid int(11) default NULL,
+        popularity float default NULL,
+        rank int(11) default NULL,
+        filename varchar(128) NOT NULL default '',
+        riperrors varchar(24) default NULL,
+        PRIMARY KEY  (trackid)
+      );
+      insert into tracks select *, NULL from oldtracks;
+      drop table oldtracks;
+
+- added a --aggressive option to ripdisc.pl, which takes an argument
+  from 0 to 9.  The higher the aggressiveness, the greater tolerance
+  of error corrections per sector it will be.  Based on the agressive
+  value, it will eventually give up the error correction and just
+  tell cdparanoia to rip it without any error correction.  The default
+  is maximum agressiveness (9).
+  The server doesn't support taking an agressiveness argument from the
+  client and the client doesn't offer the user an option for 
+  aggressiveness (yet).
+
+- more status information is generated for ripping
+
+- the client and server now support aborting a rip in progress.
+
+- a bunch of strange bugs were fixed in the client, mostly related to 
+  odd crashes when using SDL::Timer and how it interacts with perl.  I've 
+  gotten rid of using SDL::Timer objects all together.  The client is
+  a lot stabler now.
+
+- I removed some of the larger, unused files from the client/images
+  directory that were left over from my testing.
+
+- Fixed some bugs with the slider on the albums page, it was being positioned
+  all the way to the left when it should have been all the way to the right
+
+- Client now uses Data::Dumper to determine if the screen needs to be updated
+  This cuts down on memory usage, as there appears to be a bug in the TTF
+  libs I'm using, or SDL::TTFont code such that memory gets leaked everytime 
+  lots of text is drawn to a surface.
+
+$Header: /home/cvs/thundaural/CHANGELOG,v 1.1 2004/01/08 09:11:02 jukebox Exp $

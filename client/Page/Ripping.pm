@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-# $Header: /home/cvs/thundaural/client/Page/Ripping.pm,v 1.6 2004/01/01 21:25:13 jukebox Exp $
+# $Header: /home/cvs/thundaural/client/Page/Ripping.pm,v 1.9 2004/01/04 04:57:19 jukebox Exp $
 
 package Page::Ripping;
 
@@ -69,8 +69,6 @@ sub new {
 	$this->{-albums} = $o{-albums}; # new Albums(-server=>$this->{-server});
 	die("passed argument for -albums not an Album object") if (!ref($this->{-albums}) && !$this->{-albums}->isa('Albums'));
 
-	$this->{-layout} = new Layout(-server=>$this->{-server});
-
 	$this->{-storagedir} = '/home/storage';
 
 	$this->{-topline} = $this->{-rect}->y();
@@ -101,11 +99,12 @@ sub _make() {
 	$updater->on_event($main::E_UPDATESTATUS, sub { if($this->{-appstate}->{current_page} eq 'ripping') { $this->update(); } } );
 	$this->add_widget($updater); # make sure this sorts first
 
-	foreach my $reader ('cdrom') {
+	my @readers = @{$this->{-server}->devices('read')};
+	my $firstreader = shift @readers;
+	foreach my $reader ($firstreader) {
 		my $actionbutton = new Button(
 				-name=>"00-ripaction-$reader",
 				-canvas=>$this->{-canvas},
-				#-mask=>new SDL::Rect(-width=>150, -height=>50, -x=>50, -x=>110)
 				-mask=>new SDL::Rect(-width=>150, -height=>50, -x=>10, -y=>400)
 			);
 		foreach my $act ('start', 'abort') {
@@ -129,7 +128,6 @@ sub _make() {
 		my $coverartbutton = new Button(
 				-name=>"00-coverart-$reader",
 				-canvas=>$this->{-canvas},
-				#-mask=>new SDL::Rect(-width=>400, -height=>400, -x=>600, -y=>200)
 				-mask=>new SDL::Rect(-width=>200, -height=>200, -x=>10, -y=>$topline+10)
 			);
 		$coverartbutton->predraw( sub { &main::draw_background($this->widget("00-coverart-$reader")->mask(), $this->{-canvas}); } );
@@ -145,16 +143,21 @@ sub now_viewing() {
 	$this->update();
 }
 
-sub busy() {
+sub busy {
 	my $this = shift;
 	my $device = shift;
 
-	$device = 'cdrom' if (!defined($device));
+	if (!defined($device)) {
+		my @readers = @{$this->{-server}->devices('read')};
+		$device = shift @readers;
+	}
 
-	return ($this->{-server}->status_of($device)->{state} ne 'idle');
+	my $state = $this->{-server}->status_of($device)->{state};
+	return (defined($state) && $state ne 'idle');
+	#return ($this->{-server}->status_of($device)->{state} ne 'idle');
 }
 
-sub update() {
+sub update {
 	my $this = shift;
 	my $transparent = new SDL::Color(-r=>5, -g=>3, -b=>2);
 	my $barcolor = new SDL::Color(-r=>0, -g=>0, -b=>0);
@@ -165,10 +168,13 @@ sub update() {
 	my $x = $this->{-s};
 	my $g = 10;
 	my $indent = 400;
-	foreach my $reader ('cdrom') {
+	my @readers = @{$this->{-server}->devices('read')};
+	my $firstreader = shift @readers;
+	foreach my $reader ($firstreader) {
 		my $s = $this->{-server}->status_of($reader);
 		my $ss = Dumper($s);
 		if (!defined($this->{-last}->{$reader}) || $this->{-last}->{$reader} ne $ss) {
+			$this->widget("00-ripaction-$reader")->frame($this->busy($reader) ? 'abort' : 'start');
 			$x->fill(0, $transparent);
 			$x->set_color_key(SDL::SDL_SRCCOLORKEY, $transparent);
 			my $vx = $s->{volume};

@@ -1,7 +1,7 @@
 
 package Albums;
 
-# $Header: /home/cvs/thundaural/client/Albums.pm,v 1.2 2003/12/27 11:47:14 jukebox Exp $
+# $Header: /home/cvs/thundaural/client/Albums.pm,v 1.3 2004/01/03 07:17:45 jukebox Exp $
 
 use strict;
 use warnings;
@@ -36,7 +36,7 @@ sub _populate {
 		foreach my $al (@$x) {
 			$this->{albums}->{$al->{albumid}} = $al;
 		}
-		$this->{sorted_performer} = $this->_sort_by('performer');
+		$this->{sorted_performer} = $this->_sort_by('performer', 'name');
 	} else {
 		die("change this to fail gracefully");
 	}
@@ -46,6 +46,15 @@ sub _populate {
 sub _sort_by {
 	my $this = shift;
 	my $how = shift;
+	my $how2 = shift;
+
+	if ($how2) {
+		return [ sort { ($this->{albums}->{$a}->{$how}.' '.$this->{albums}->{$a}->{$how2} )
+				cmp 
+				($this->{albums}->{$b}->{$how}.' '.$this->{albums}->{$b}->{$how2} )
+			} keys %{$this->{albums}} ];
+		
+	}
 
 	return [ sort { $this->{albums}->{$a}->{$how} cmp $this->{albums}->{$b}->{$how} } keys %{$this->{albums}} ];
 }

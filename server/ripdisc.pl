@@ -1,8 +1,6 @@
 #!/usr/bin/perl
 
-# $Header: /home/cvs/thundaural/server/ripdisc.pl,v 1.6 2004/01/01 23:26:17 jukebox Exp $
-
-my $BINDIR ='/home/users/jukebox/Jukebox/thundaural/server';
+# $Header: /home/cvs/thundaural/server/ripdisc.pl,v 1.7 2004/01/04 09:51:58 jukebox Exp $
 
 my $bin_getcoverart = './getcoverart.php';
 my $bin_cdparanoia = '/usr/bin/cdparanoia';
@@ -18,9 +16,18 @@ use CDDB_get qw( get_cddb );
 my $storagedir;
 my $cddevice;
 my $maxtracks = 0;
+my $dryrun = 0;
 my $sqlitedb = '';
+my $sqldebugfile = "/tmp/ripsql.debug.$$";
+              #0  1   2    3     4      5      6      7       8       9
+my @mcscale = (0, 50, 500, 1000, 10000, 25000, 75000, 100000, 200000, 500000);
+my $maxcorrections = $mcscale[9];
 while (@ARGV) {
 	$a = shift @ARGV;
+	if ($a =~ m/^--dryrun/) {
+		$dryrun = 1;
+		next;
+	}
 	if ($a =~ m/^--maxtracks/) {
 		$maxtracks = shift @ARGV;
 		$maxtracks += 0;
@@ -35,12 +42,25 @@ while (@ARGV) {
 	if ($a =~ m/^--sqlitedb/) {
 		$sqlitedb = shift @ARGV;
 		die("$0: missing argument to --sqlitedb\n") if (!$sqlitedb);
+		die("$0: unable to open sqlitedb $sqlitedb\n") if (!(-e $sqlitedb));
 		next;
 	}
-	die("Usage: $0 [--maxtracks <n>] --device /dev/cdromdevice --sqlitedb <sqlitedb>\n");
+	if ($a =~ m/^--aggressive/) {
+		my $x = shift @ARGV;
+		die("$0: missing argument to --aggressive\n") if (!defined($x));
+		die("$0: --aggressive argument must be a digit 0 to 9\n") if ($x !~ m/^\d$/);
+		$x = int($x);
+		$maxcorrections = $mcscale[$x];
+		next;
+	}
+	die("Usage: $0 [--dryrun] [--maxtracks <n>] [--aggressive <0-9>] --device /dev/cdromdevice --sqlitedb <sqlitedb>\n");
 }
 
 die ("missing --sqlitedb argument\n") if (!$sqlitedb);
+
+if ($maxcorrections > $mcscale[9] || $maxcorrections < 0) {
+	$maxcorrections = $mcscale[9];
+}
 
 use Settings;
 
@@ -132,20 +152,22 @@ if (&already_have_album(%cd)) {
 		my $tlen = $tracklens->[$n];
 
 		#&log_current_rip("$artist - $albumtitle - $tracktitle (track $track of $maxtracks, $tlen secs in length)", $cddevice);
-		$abort_rip = &rip_track($track, $outfile, $genre, $artist, $albumtitle, $tracktitle, $maxtracks);
+		my $totalcorrections;
+		($abort_rip, $totalcorrections) = &rip_track($track, $outfile, $genre, $artist, $albumtitle, $tracktitle, $maxtracks);
 		if ($abort_rip) {
 			&dumpstatus('idle', $abort_rip);
 			last;
 		}
 
-		$q = "insert into tracks (albumid, performer, name, genreid, filename, length, albumorder) values (#albumid#, %s, %s, %s, %s, %s, %s)";
+		$q = "insert into tracks (albumid, performer, name, genreid, filename, length, albumorder, riperrors) values (#albumid#, %s, %s, %s, %s, %s, %s, %s)";
 		$q = sprintf($q,
 				$dbh->quote($artist),
 				$dbh->quote($tracktitle),
 				$dbh->quote($genreid),
 				$dbh->quote($realoutfile),
 				$dbh->quote($tracklength),
-				$dbh->quote($track)
+				$dbh->quote($track),
+				$dbh->quote($totalcorrections)
 			);
 		#push(@$final_sqlcmds, $q);
 
@@ -167,8 +189,12 @@ if (&already_have_album(%cd)) {
 		# run the initial SQL commands
 		# (put the album into the database)
 		foreach $q (@$final_sqlcmds) {
-			my $sth = &sqlprepare($q);
-			eval { $sth->execute; }
+			if ($dryrun) {
+				print "$q\n";
+			} else {
+				my $sth = &sqlprepare($q);
+				eval { $sth->execute; }
+			}
 		}
 
 		# rename all the files
@@ -185,14 +211,20 @@ if (&already_have_album(%cd)) {
 				my $finalfile = '';
 				$finalfile = $fa->{'finalfile'} if ($fa->{'finalfile'});
 				$finalfile = "$storagedir/$finalfile";
-				if ((!-e $s) || rename $s, $finalfile) {
-					# renaming the file was successful
-					# record it in the database
+				if ($dryrun) {
 					my $q = $fa->{'sql'};
-					my $sth = &sqlprepare($q);
-					eval { $sth->execute; };
-					$renamedfiles++;
-					# should really have more error checking here
+					print "$q\n";
+					$renamedfiles++; # so the check below doesn't fail and we end up modifying the database
+				} else {
+				if ((!-e $s) || rename $s, $finalfile) {
+						# renaming the file was successful
+						# record it in the database
+						my $q = $fa->{'sql'};
+						my $sth = &sqlprepare($q);
+						eval { $sth->execute; };
+						$renamedfiles++;
+						# should really have more error checking here
+					}
 				}
 			}
 		}
@@ -221,6 +253,12 @@ sub sqlprepare($) {
 		my $v = $sqlvariables{$k};
 		$k = "#$k#";
 		$q =~ s/$k/$v/g;
+	}
+
+	if ($sqldebugfile) {
+		open(F, ">$sqldebugfile");
+		print F "$q\n";
+		close(F);
 	}
 	my $sth = $dbh->prepare($q);
 	return $sth;
@@ -269,13 +307,17 @@ sub get_genre($) {
 	$sth->finish;
 	return $genreid if ($genreid);
 
-	$q = "insert into genres values (NULL, ?)"; # unique index exists on category column
-	$sth = $dbh->prepare($q);
-	eval {
-		$sth->execute($genre);
-	};
-	$sth->finish;
-	$genreid = &last_insert_rowid();
+	if ($dryrun) {
+		$genreid = -1; # just fill it in, we arn't modifying the database during a dry run
+	} else {
+		$q = "insert into genres values (NULL, ?)"; # unique index exists on category column
+		$sth = $dbh->prepare($q);
+		eval {
+			$sth->execute($genre);
+		};
+		$sth->finish;
+		$genreid = &last_insert_rowid();
+	}
 
 	return $genreid;
 }
@@ -291,12 +333,20 @@ sub rip_track($$$$$$$) {
 
 	my $result = 0;
 
-	#my @opts = (' with error correction', ' without error correction'); # order to process in
-	my @opts = ('with error correction', 'without error correction'); # order to process in
-	my %opts = ('with error correction'=>'', 'without error correction'=>'--disable-paranoia'); # the arguments to use
+	# order to process in
+	my @opts = ('with error correction', 'without error correction'); 
+	# the arguments for cdparanoia to use
+	my %opts = ('with error correction'=>'', 'without error correction'=>'--disable-paranoia'); 
+	# in the case of disabling paranoia, we won't have any correction attempts and we want to record that
+	my %startwithtcvalue = ('with error correction'=>0, 'without error correction'=>'no correction'); 
 	my $started = time();
+	my $totalcorrections;
+	if ($maxcorrections == 0) {
+		pop @opts; # no corrections?  just skip trying to do it with corrections
+	}
 	ATTEMPT:
 	foreach my $optsk (@opts) {
+		$totalcorrections = $startwithtcvalue{$optsk};
 		my $opts = $opts{$optsk};
 		$result = 0;
 		my $ripcmd = "$bin_cdparanoia $opts --force-cdrom-device $cddevice --stderr-progress --output-wav $track -";
@@ -338,7 +388,6 @@ sub rip_track($$$$$$$) {
 		my $FRAMESIZE = 2352 / 2;
 
 		my $mod = int(rand(15)) + 43;
-		my $maxcorrections = 500000;
 
 		my $cdpid;
 		CDPOUTPUT:
@@ -352,10 +401,12 @@ sub rip_track($$$$$$$) {
 			if ($line =~ m/\[correction\] \@ (\d+)/) {
 				my $sector = ((1 + $1) / $FRAMESIZE) - 1;
 				$corrections++;
+				$totalcorrections++ if ($optsk ne 'without error correction');
 				if (($corrections % $mod) == 0) {
 					&dumpstatus('ripping', $optsk, "$track/$maxtracks", $artist, $title, $genre, 0, 0, $tracklen, '?', $started, $corrections, $oldpct);
 				}
 				if ($corrections >= $maxcorrections) {
+					&dumpstatus('ripping', $optsk, "$track/$maxtracks", $artist, $title, $genre, 0, 0, $tracklen, '?', $started, $corrections, $oldpct);
 					kill 15, $cdpid;
 					close(PAR);
 					next ATTEMPT;
@@ -392,7 +443,7 @@ sub rip_track($$$$$$$) {
 	if (!-s $outfile) {
 		$result = "output file empty";
 	}
-	return $result; # SUCCESS!
+	return ($result, $totalcorrections); # SUCCESS!
 }
 
 sub last_insert_rowid() {

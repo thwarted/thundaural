@@ -1,3 +1,4 @@
+#!/usr/bin/perl
 
 package ServerCommands;
 
@@ -12,9 +13,11 @@ use DBI;
 use Settings;
 use Logger;
 
-# $Header: /home/cvs/thundaural/server/ServerCommands.pm,v 1.4 2004/01/01 23:24:21 jukebox Exp $
+my $BIN_DF = '/bin/df';
 
-my @cmds = sort qw/pause skip tracks queued devices play albums quit help noop volume status who name rip abort/;
+# $Header: /home/cvs/thundaural/server/ServerCommands.pm,v 1.7 2004/01/04 09:52:36 jukebox Exp $
+
+my @cmds = sort qw/pause skip tracks queued devices play albums quit help noop volume status who name rip abort stats/;
 
 sub new {
 	my $class = shift;
@@ -56,23 +59,6 @@ sub new {
 
 	$this->{-dbh} = DBI->connect("dbi:SQLite:dbname=".$this->{-dbfile},"","");
 	die("unable to open \"".$this->{-dbfile}."\"") if (!$this->{-dbh});
-	$this->{-sqlvariables} = {};
-	$this->{-dbh}->func('setval', 2, sub { 
-			my $name = shift; 
-			my $value = shift; 
-			$this->{-sqlvariables}->{$name} = $value; 
-			Logger::logger("setval($name, $value)");
-			return $value; 
-		}, 'create_function' );
-	$this->{-dbh}->func('nextval', 1, sub { 
-			my $name = shift; 
-			if (!exists($this->{-sqlvariables}->{$name})) {
-				$this->{-sqlvariables}->{$name} = 0;
-			}
-			my $v = $this->{-sqlvariables}->{$name}++;
-			Logger::logger("nextval($name) = $v");
-			return $v; 
-		}, 'create_function' );
 
 	return $this;
 }
@@ -119,7 +105,79 @@ sub cmd_who {
 			($connections->{$c}->{inputs} || 0),
 			($connections->{$c}->{outputs} || 0));
 	}
-	return $this->_format_list(200, 'client name inputs outputs', [@r]);
+	return $this->_format_list(201, 'client name inputs outputs', [@r]);
+}
+
+sub cmd_stats {
+	my $this = shift;
+	my $input = shift;
+
+	if ($input =~ m/^help/) {
+		return (200, "200 stats - show system statistics\n");
+	}
+
+	my %v = ();
+	eval {
+		lock(${$this->{-dblock}});
+		my $q = "select count(1) from tracks";
+		my $sth = $this->{-dbh}->prepare($q);
+		$sth->execute();
+		($v{tracks}) = $sth->fetchrow_array();
+		$sth->finish();
+	};
+	eval {
+		lock(${$this->{-dblock}});
+		my $q = "select count(1) from albums";
+		my $sth = $this->{-dbh}->prepare($q);
+		$sth->execute();
+		($v{albums}) = $sth->fetchrow_array();
+		$sth->finish();
+	};
+	eval {
+		lock(${$this->{-dblock}});
+		my $q = "select count(1), action from playhistory group by action";
+		my $sth = $this->{-dbh}->prepare($q);
+		$sth->execute();
+		while (my($c, $a) = $sth->fetchrow_array()) {
+			$v{"tracks$a"} = int($c);
+		}
+		$sth->finish();
+	};
+	eval {
+		lock(${$this->{-dblock}});
+		my $q = "select count(1) from albums where coverartfile is not NULL";
+		my $sth = $this->{-dbh}->prepare($q);
+		$sth->execute();
+		($v{coverartfiles}) = $sth->fetchrow_array();
+		$sth->finish();
+	};
+	eval {
+		open(UPTIME, "</proc/uptime") || die($@);
+		my $line = <UPTIME>;
+		close(UPTIME);
+		my @x = split(/\s+/, $line);
+		$v{uptime} = int(shift @x);
+	};
+	eval {
+		# it would be cool if we used statfs(2) here
+		my $sd = Settings::storagedir();
+		my @x = `$BIN_DF $sd`;
+		#Filesystem           1K-blocks      Used Available Use% Mounted on
+		#/dev/hda8             32589620   7906656  23027468  26% /home
+		my $x = pop @x;
+		@x = split(/\s+/, $x);
+		$v{storagetotal} = int($x[1]);
+		$v{storageused} = int($x[2]);
+		$v{storageavailable} = int($x[3]);
+		$x = $x[4]; $x =~ s/\D//g;
+		$v{storagepercentagefull} = int($x);
+	};
+
+	my @r = ();
+	foreach my $k (sort keys %v) {
+		push(@r, sprintf("%s\t%s\n", $k, $v{$k}));
+	}
+	return $this->_format_list(201, 'key value', [@r]);
 }
 
 sub cmd_ps {
@@ -134,7 +192,7 @@ sub cmd_ps {
 	my $keys = shift @x;
 	$keys = lc $keys;
 	$keys =~ s/\s+/ /g;
-	return $this->_format_list(200, $keys, [@x]);
+	return $this->_format_list(201, $keys, [@x]);
 }
 
 sub cmd_name {
@@ -198,7 +256,7 @@ sub cmd_volume {
 		return (200, "200 volume changed from $oldvolsetting to $newvolsetting\n");
 	} else {
 		my $curvolsetting = $this->_parse_aumix_output($qcmd);
-		return $this->_format_list(200, "device volume", ["$d\t$curvolsetting\n"]);
+		return $this->_format_list(201, "device volume", ["$d\t$curvolsetting\n"]);
 	}
 	return 200;
 }
@@ -303,7 +361,7 @@ sub cmd_status {
 
 	}
 
-	return $this->_format_list(200, join(' ', @keys), [@r]);
+	return $this->_format_list(201, join(' ', @keys), [@r]);
 }
 
 sub cmd_rip {
@@ -467,7 +525,7 @@ sub cmd_track {
 			$a->{genre}, $a->{length}, $a->{trackid},
 			($a->{popularity} || 0), ($a->{rank} || 0), time(), time(), 1, 0);
 	push (@r, $x);
-	return $this->_format_list(200, "trackref performer name genre length trackid".
+	return $this->_format_list(201, "trackref performer name genre length trackid".
 			" popularity rank last-played last-queued times-played times-skipped", [@r]);
 }
 
@@ -509,15 +567,15 @@ sub cmd_tracks {
 		while(my $a = $sth->fetchrow_hashref()) {
 			my $x = sprintf("%d/%d\t".
 					"%s\t%s\t%s\t%d\t%d\t".
-					"%.7f\t%d\n",
+					"%.7f\t%d\t%d\n",
 					$albumid, $a->{albumorder}, 
 					$a->{performer}, $a->{name}, $a->{genre}, $a->{length}, $a->{trackid}, 
-					($a->{popularity} || 0), ($a->{rank} || 0));
+					($a->{popularity} || 0), ($a->{rank} || 0), ($a->{riperrors} || 0));
 			push(@r, $x);
 		}
 		$sth->finish;
 	}
-	return $this->_format_list(200, "trackref performer name genre length trackid popularity rank", [@r]);
+	return $this->_format_list(201, "trackref performer name genre length trackid popularity rank", [@r]);
 }
 
 sub cmd_queued {
@@ -558,7 +616,7 @@ sub cmd_queued {
 		$total++;
 	}
 	$sth->finish;
-	return $this->_format_list(200, "devicename trackref performer name genre length trackid requestedat popularity rank", [@r]);
+	return $this->_format_list(201, "devicename trackref performer name genre length trackid requestedat popularity rank", [@r]);
 }
 
 sub _is_valid_devicename_for_type($$) {
@@ -596,7 +654,7 @@ sub cmd_devices {
 		}
 		$total++;
 	}
-	return $this->_format_list(200, "device-name type", [@r]);
+	return $this->_format_list(201, "devicename type", [@r]);
 }
 
 sub cmd_play {
@@ -691,7 +749,7 @@ sub cmd_albums {
 		push(@r, $x);
 	}
 	$sth->finish;
-	return $this->_format_list(200, "albumid performer name length tracks coverartfile", [@r]);
+	return $this->_format_list(201, "albumid performer name length tracks coverartfile", [@r]);
 }
 
 sub cmd_quit {
@@ -730,7 +788,7 @@ sub cmd_help {
 			push(@r, @$lines);
 		}
 	}
-	return $this->_format_list(200, "", [@r]);
+	return $this->_format_list(201, "", [@r]);
 }
 
 sub cmd_noop {
@@ -781,8 +839,7 @@ sub _update_track_ranks {
 	$t = sprintf('%.2f', $t);
 
 	my $viewname = "ranks$$";
-	$this->{-dbh}->do("create temporary view $viewname as select count(1) as cnt, trackid from playhistory where action = 'played' group by 2");
-	#$this->{-dbh}->do("select setval('rank', 0)");
+	$this->{-dbh}->do("create temporary table $viewname as select count(1) as cnt, trackid from playhistory where action = 'played' group by 2");
 	$q = "select cnt, round(cnt/$t, 7), trackid from $viewname order by 1 desc";
 	Logger::logger($q);
 	$sth = $this->{-dbh}->prepare($q);
@@ -806,7 +863,27 @@ sub _update_track_ranks {
 		$this->{-dbh}->commit();
 	}
 	$sth->finish;
-	$this->{-dbh}->do("drop view $viewname");
+	$this->{-dbh}->do("drop table $viewname");
 }
 
 1;
+
+__END__
+
+	$this->{-sqlvariables} = {};
+	$this->{-dbh}->func('setval', 2, sub { 
+			my $name = shift; 
+			my $value = shift; 
+			$this->{-sqlvariables}->{$name} = $value; 
+			Logger::logger("setval($name, $value)");
+			return $value; 
+		}, 'create_function' );
+	$this->{-dbh}->func('nextval', 1, sub { 
+			my $name = shift; 
+			if (!exists($this->{-sqlvariables}->{$name})) {
+				$this->{-sqlvariables}->{$name} = 0;
+			}
+			my $v = $this->{-sqlvariables}->{$name}++;
+			Logger::logger("nextval($name) = $v");
+			return $v; 
+		}, 'create_function' );

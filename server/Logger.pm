@@ -4,20 +4,30 @@ package Logger;
 
 use File::Basename;
 
+my $dest = 0;
+
+foreach my $a (@ARGV) {
+        if ($a =~ m/^--stderr$/) {
+		$dest = 1;
+                next;
+        }
+}
+
 my $bin_logger = '/usr/bin/logger';
-my $SELFSHORT = File::Basename::basename($0);
 
 sub logger {
-	my $msg = shift;
-	my $from = shift;
-	if (!$from) { $from = "server"; }
-	my($package, $filename, $line) = caller;
-	#my $tag = $SELFSHORT;
-	$filename = File::Basename::basename($filename);
-	my $tag = "$filename:$line";
-	$tag .= "[$$]";
-	my $x = `$bin_logger -t "$tag" -- '$msg'`;
-	#printf STDERR "%20s:%-5d: (%21s) %s\n", $filename, $line, $from, $msg;
+        my($package, $filename, $line) = caller(0);
+        my(undef, undef, undef, $subroutine) = caller(1);
+	$subroutine = $package if (!$subroutine);
+        my $prefix = "$subroutine($line)";
+        my $format = shift;
+        $msg = sprintf($format, @_);
+	if ($dest == 0) {
+		$prefix .= "[$$]";
+		my $x = `$bin_logger -t "$prefix" -- '$msg'`;
+	} elsif ($dest == 1) {
+        	printf STDERR "\%s: \%s\n", $prefix, $msg;
+	}
 }
 
 1;

@@ -23,6 +23,7 @@ sub new {
 	$this->{lasttrackref} = {};
 	$this->{statuslastupdate} = 0;
 	$this->{queuedonlastupdate} = 0;
+	$this->{deviceslastupdate} = 0;
 	$this->{errorfunc} = $opts{-errorfunc};
 	$this->{recoveredfunc} = $opts{-recoveredfunc};
 	                                                                                                                                                    
@@ -118,12 +119,45 @@ sub _populate_queuedon {
 	}
 }
 
+sub _populate_devices {
+	my $this = shift;
+	return if ($this->{deviceslastupdate}+600 > time());
+	my $d = $this->_do_cmd('devices');
+	if (ref($d) eq 'ARRAY') {
+		$this->{devices} = {};
+		foreach my $x (@$d) {
+			my $dt = $x->{type};
+			if (!defined($this->{devices}->{$dt})) {
+				$this->{devices}->{$dt} = [];
+			}
+			push(@{$this->{devices}->{$dt}}, $x);
+		}
+		$this->{deviceslastupdate} = time();
+	} else {
+		warn("unable to get device list, result was $d");
+	}
+}
+
 sub tracks {
 	my $this = shift;
 	my $alir = shift;
 
 	return [] if (!$alir);
 	return $this->_do_cmd('tracks', $alir);
+}
+
+sub devices {
+	my $this = shift;
+	my $type = shift;
+
+	$this->_populate_devices();
+	return [] if (!$type);
+	my @ret = (); 
+	foreach my $d (@{$this->{devices}->{$type}}) {
+		my $dn = $d->{devicename};
+		push(@ret, $dn);
+	}
+	return [@ret];
 }
 
 sub time {

@@ -1,0 +1,68 @@
+Just a short overview of the installation to get you started.  I am, of 
+course, available to help you with installation.  You can contact me at
+    ta at thwartedefforts dot org
+or on AIM, my AIM logon is ThwartedE
+
+More dependancies are listed on the website.
+http://thwartedefforts.org/jukebox/
+
+Review server/Settings.pm.  Hopefully the paths you need to make
+or change will be obvious.
+
+
+copy server/usr-local-lib-php/* to /usr/local/lib/php
+these are just Amazon's webservices, you can put them somewhere else, if
+so then change server/getcoverart.php
+
+
+mkdir /home/storage, and of course it should be writable by the user who 
+will be running the server it should be readable by the user that runs 
+the client (so the client can read the coverart files)
+
+
+mkdir /home/storage/db 
+this is where the SQLite database is stored, needs to be writable by the 
+server user
+
+
+Download the database schema and create the database in SQLite.
+Look in the database/ directory available in the server tar file for an 
+empty SQLite database and the schema.  You can use the empty SQLite 
+database right away, just copy it to /home/storage/db/data.db
+
+
+start up the server
+    cd ./server ; ./server.pl --stderr
+if you don't specify --stderr, it will write to syslog using /usr/bin/logger
+(I plan on changing this to use a perl module).  It's mainly debugging and
+progress information that is written out.  I'm also going to add automatic
+daemonization
+
+
+start up the client
+    cd ./client ; ./interface.pl
+This dumps a bunch of debugging information to stderr, mostly useless for
+day to day operation
+
+
+My production system starts up the server and the client from inittab, 
+with the client in a dedicated X session.  Setting it up a machine as a 
+dedicated jukebox is beyond the scope of this document, but anyone with 
+reasonable UNIX knowledge should be able to muddle through it.  I can
+give you the scripts I'm using and details on how I have my system
+setup if need be.  More documentation on this will be forth coming,
+if anyone asks.
+
+
+The server/ripdisc.pl script uses cdparanoia and oggenc, you'll need to
+have those installed, along with CDDB_get (available on CPAN).
+
+
+That should be it.  You'll have to rip some CDs using the in-system CD 
+ripper before you can start playing anything (in the works is import
+functionality).  Admittedly, I have not tested it yet with a completely 
+empty database -- I have no idea what the client will do.  Please let 
+me know if you have any problems.
+
+$Header: /home/cvs/thundaural/INSTALL,v 1.2 2004/01/08 08:51:52 jukebox Exp $
+

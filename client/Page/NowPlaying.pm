@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-# $Header: /home/cvs/thundaural/client/Page/NowPlaying.pm,v 1.5 2003/12/30 07:01:19 jukebox Exp $
+# $Header: /home/cvs/thundaural/client/Page/NowPlaying.pm,v 1.6 2004/01/04 04:57:19 jukebox Exp $
 
 package Page::NowPlaying;
 
@@ -59,8 +59,6 @@ sub new {
 	$this->{-albums} = $o{-albums}; # new Albums(-server=>$this->{-server});
 	die("passed argument for -albums not an Album object") if (!ref($this->{-albums}) && !$this->{-albums}->isa('Albums'));
 
-	$this->{-layout} = new Layout(-server=>$this->{-server});
-
 	$this->{-storagedir} = '/home/storage';
 	
 	$this->{-imgsurfaces}->{button_play_depressed} = new SDL::Surface(-name=>"./images/button-play-depressed.png");
@@ -115,7 +113,7 @@ sub _make() {
 sub update {
 	my $this = shift;
 
-	my $outputs = $this->{-layout}->outputs();
+	my $outputs = $this->{-server}->devices('play');
 	my $changed = 0;
 	foreach my $output (@$outputs) {
 		my($key, $d);

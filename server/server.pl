@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-# $Header: /home/cvs/thundaural/server/server.pl,v 1.2 2003/12/27 21:00:09 jukebox Exp $
+# $Header: /home/cvs/thundaural/server/server.pl,v 1.5 2004/01/08 09:18:26 jukebox Exp $
 
 use strict;
 use warnings;
@@ -70,18 +70,7 @@ my $playerthrs = {};
 	my $playdevs = Settings::get_of_type('play');
 	foreach my $po (@$playdevs) {
 		my $device = $po->{devicename};
-		my $stat_state : shared = 'idle';
-		my $stat_position : shared = '';
-		my $stat_track : shared = '';
-		my $player = new Player(-dbfile=>$dbfile,
-					-device=>$device,
-					-ref_state=>\$stat_state,
-					-ref_position=>\$stat_position,
-					-ref_track=>\$stat_track,
-					-ref_dblock=>\$dblock,
-				);
-		my $playerthr = threads->new(sub { $player->run(); });
-		$playerthrs->{$device} = {-thread=>$playerthr, -object=>$player};
+		$playerthrs->{$device} = &spawn_player_thread($device);
 	}
 }
 my $readerthrs = {};
@@ -89,26 +78,50 @@ my $readerthrs = {};
 	my $readdevs = Settings::get_of_type('read');
 	foreach my $ro (@$readdevs) {
 		my $device = $ro->{devicename};
-		my $stat_state : shared = 'idle';
-		my $stat_track : shared = '';
-		my $reader = new Reader(-dbfile=>$dbfile,
-					-device=>$device,
-					-ref_state=>\$stat_state,
-					-ref_track=>\$stat_track,
-					-ref_dblock=>\$dblock
-				);
-		my $readerthr = threads->new(sub { $reader->run(); });
-		$readerthrs->{$device} = {-thread=>$readerthr, -object=>$reader};
+		$readerthrs->{$device} = &spawn_reader_thread($device);
 	}
 }
 sleep 3; # give everything a chance to initialize
 my $serverthr = threads->new(\&server);
 $serverthr->join;
-foreach my $device (keys %$playerthrs) {
-	$playerthrs->{$device}->{-thread}->join;
+undef $serverthr;
+
+exit;
+
+sub spawn_player_thread {
+	my $device = shift;
+	my $stat_state : shared = 'idle';
+	my $stat_position : shared = '';
+	my $stat_track : shared = '';
+	my $player = new Player(-dbfile=>$dbfile,
+				-device=>$device,
+				-ref_state=>\$stat_state,
+				-ref_position=>\$stat_position,
+				-ref_track=>\$stat_track,
+				-ref_dblock=>\$dblock,
+			);
+	# we set this to one here to avoid a race condition, whereby the thread hasn't started yet, and we still read -running as 0
+	my $running : shared = 1;
+	my $playerthr = threads->new(sub { $running = 1; eval { $player->run(); }; Logger::logger("player thread for $device no longer running"); $running = 0; });
+	my $ret = {-thread=>$playerthr, -object=>$player, -running=>\$running};
+	return $ret;
 }
-foreach my $device (keys %$readerthrs) {
-	$readerthrs->{$device}->{-thread}->join;
+
+sub spawn_reader_thread {
+	my $device = shift;
+	my $stat_state : shared = 'idle';
+	my $stat_track : shared = '';
+	my $reader = new Reader(-dbfile=>$dbfile,
+				-device=>$device,
+				-ref_state=>\$stat_state,
+				-ref_track=>\$stat_track,
+				-ref_dblock=>\$dblock
+			);
+	# we set this to one here to avoid a race condition, whereby the thread hasn't started yet, and we still read -running as 0
+	my $running : shared = 1; 
+	my $readerthr = threads->new(sub { $running = 1; eval { $reader->run(); }; Logger::logger("reader thread for $device no longer running"); $running = 0; });
+	my $ret = {-thread=>$readerthr, -object=>$reader, -running=>\$running};
+	return $ret;
 }
 
 sub server {
@@ -150,8 +163,22 @@ sub server {
 					$input =~ s/\r?\n$//;
 					next if ($input =~ m/^$/);
 					last READLOOP if ($input =~ m/^shut/);
+
+					# the following if was added to test player/reader thread restarting upon death
+					# it will eventually be removed
+					if ($input =~ m/^exit (\w+)$/) {
+						my $dv = $1;
+						if (exists($playerthrs->{$dv})) {
+							$playerthrs->{$dv}->{-object}->cmdqueue()->enqueue('abort');
+							$playerthrs->{$dv}->{-object}->cmdqueue()->enqueue(undef); # get the player thread to exit
+							print $fh "200 told $dv to abort\n";
+						} else {
+							print $fh "300 unknown play device $dv\n";
+						}
+						next;
+					}
+
 					my ($result, $output) = eval { $cmdhandler->process($input, $fh, $connections); };
-					warn($@) if ($@);
 					Logger::logger($@, 'server') if ($@);
 					if (ref($output) ne 'ARRAY') {
 						$output = [$output];
@@ -197,6 +224,20 @@ sub server {
 			my $amt = scalar @{$pendingwrites->{$p}};
 			if (!$amt) { $selwriters->remove($p); }
 		}
+		foreach my $dv (keys %$playerthrs) {
+			if (! ${$playerthrs->{$dv}->{-running}}) {
+				Logger::logger("player thread for $dv seems to have died, creating new");
+				$playerthrs->{$dv}->{-thread}->join();
+				$playerthrs->{$dv} = &spawn_player_thread($dv);
+			}
+		}
+		foreach my $dv (keys %$readerthrs) {
+			if (! ${$readerthrs->{$dv}->{-running}}) {
+				Logger::logger("reader thread for $dv seems to have died, creating new");
+				$readerthrs->{$dv}->{-thread}->join();
+				$readerthrs->{$dv} = &spawn_reader_thread($dv);
+			}
+		}
 
 		# commands have been pushed in to the queue that won't be used
 		# avoid filling up memory with these commands
@@ -226,5 +267,7 @@ sub server {
 		close($fh);
 	}
 	close($listener);
+
+	sleep 2; # wait for other threads to exit
 }
 

@@ -2,7 +2,7 @@
 
 package Player;
 
-# $Header: /home/cvs/thundaural/server/Player.pm,v 1.1 2003/12/27 10:25:04 jukebox Exp $
+# $Header: /home/cvs/thundaural/server/Player.pm,v 1.2 2004/01/08 06:12:02 jukebox Exp $
 
 use strict;
 use warnings;
@@ -119,6 +119,11 @@ sub run {
 			$sth->execute($this->{-device}, 'queued');
 			$playtrack = $sth->fetchrow_hashref();
 			$sth->finish;
+		}
+		if ($this->{-cmdqueue}->pending()) {
+			my $c = $this->{-cmdqueue}->dequeue();
+			last if ($c eq 'abort');
+			last if (!defined($c));
 		}
 		($this->usleep(0.5), next) if (!$playtrack);
 
