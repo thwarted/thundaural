@@ -119,25 +119,6 @@ sub queue_widget_frame {
 	&main::queue_func_call(sub { $this->{-widgets}->{$widget}->draw($frame); } );
 }
 
-sub change_page {
-	my($p, $f, $l) = caller;
-	die("change page called by $p at $f:$l");
-	my $this = shift;
-	my $page = shift;
-	my $e = new SDL::Event;
-	if ($page eq 'albums') {
-		$e->settype($main::E_SHOWALBUMS);
-	} elsif ($page eq 'tracks') {
-		$e->settype($main::E_SHOWTRACKS);
-	} elsif ($page eq 'idle') {
-		$e->settype($main::E_SHOWIDLE);
-	} else {
-		Logger::logger("attempt to change to invalid page \"$page\"");
-		return;
-	}
-	my $x = $e->push;
-}
-
 # after this method is called, $app->sync should be called to get everything to appear on screen
 sub draw {
 	my $this = shift;

@@ -2,18 +2,33 @@
 
 package Logger;
 
+use Sys::Syslog;
 use File::Basename;
 
-my $dest = 1;
+my $dest;
+BEGIN {
+	$dest = 0;
 
-foreach my $a (@ARGV) {
-        if ($a =~ m/^--stderr$/) {
-		$dest = 1;
-                next;
-        }
+	foreach my $a (@ARGV) {
+		if ($a =~ m/^--syslog$/) {
+			$dest = 0;
+			next;
+		}
+        	if ($a =~ m/^--stderr$/) {
+			$dest = 1;
+                	next;
+        	}
+	}
+	
+	if ($dest == 0) {
+		my $program = File::Basename::basename($0);
+		openlog($program, 'cons,pid', 'user');
+	}
 }
 
-my $bin_logger = '/usr/bin/logger';
+END {
+	closelog();
+}
 
 sub logger {
         my($package, $filename, $line) = caller(0);
@@ -23,8 +38,7 @@ sub logger {
         my $format = shift;
         $msg = sprintf($format, @_);
 	if ($dest == 0) {
-		$prefix .= "[$$]";
-		my $x = `$bin_logger -t "$prefix" -- '$msg'`;
+		syslog('info', '%s: %s', $prefix, $msg);
 	} elsif ($dest == 1) {
         	printf STDERR "\%s: \%s\n", $prefix, $msg;
 	}
