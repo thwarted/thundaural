@@ -1,8 +1,6 @@
 #!/usr/bin/perl
 
-# $Header: /home/cvs/thundaural/server/Thundaural/Rip/LookupFreeDB.pm,v 1.1 2004/05/22 06:40:00 jukebox Exp $
-
-package Thundaural::Rip::LookupFreeDB;
+package Thundaural::Rip::Lookup::FreeDB;
 
 use strict;
 use warnings;

@@ -1,8 +1,6 @@
 #!/usr/bin/perl
 
-# $Header: /home/cvs/thundaural/server/Thundaural/Rip/LookupMusicBrainzRemote.pm,v 1.5 2004/06/09 06:38:41 jukebox Exp $
-
-package Thundaural::Rip::LookupMusicBrainzRemote;
+package Thundaural::Rip::Lookup::MusicBrainzRemote;
 
 use strict;
 use warnings;

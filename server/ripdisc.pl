@@ -484,11 +484,15 @@ sub get_audiocd_info {
     foreach my $modulex (@$cdinfo_modules) {
         &dumpstatus('busy', "looking up CD info using $modulex");
         sleep 2;
-        my $module = sprintf('Thundaural::Rip::Lookup%s', $modulex);
+        my $module = sprintf('Thundaural::Rip::Lookup::%s', $modulex);
         eval "use $module;";
         if ($@) {
             my $x = $@;
-            chomp $x;
+            if ($x =~ m/Can't locate .+ in/) {
+                ($x) = $x =~ m!(Can't locate .+) in!;
+            } else {
+                chomp $x;
+            }
             &dumpstatus('busy', "including $modulex: $x");
             sleep 2;
             next;
