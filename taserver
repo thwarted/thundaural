@@ -157,17 +157,19 @@ sub server {
 					$connections->{$fh}->{inputs} += 1;
 					$connections->{$fh}->{outputs} += $outputlines;
 					my $msg = sprintf("%5d %4d \"%s\"", $result, $outputlines, $input);
-					if ($msg eq $lastmsg && $connections->{$fh}->{name} eq $lastname) {
-						$lastcount++;
-					} else {
-						if ($lastcount) {
-							logger("last message repeated $lastcount times", $lastname);
-						}
-						logger($msg, $connections->{$fh}->{name});
-						$lastmsg = $msg;
-						$lastname = $connections->{$fh}->{name};
-						$lastcount = 0;
-					}
+                    if ($input !~ m/^(queued|status)$/) {
+					    if ($msg eq $lastmsg && $connections->{$fh}->{name} eq $lastname) {
+						    $lastcount++;
+					    } else {
+						    if ($lastcount) {
+							    logger("last message repeated $lastcount times", $lastname);
+						    }
+						    logger($msg, $connections->{$fh}->{name});
+						    $lastmsg = $msg;
+						    $lastname = $connections->{$fh}->{name};
+						    $lastcount = 0;
+					    }
+                    }
 					if ($outputlines) {
 						push(@{$pendingwrites->{$fh}}, @$output);
 						$selwriters->add($fh);
