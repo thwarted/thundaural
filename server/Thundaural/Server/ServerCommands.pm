@@ -789,10 +789,10 @@ sub cmd_tracks {
         while(my $a = $sth->fetchrow_hashref()) {
             my $x = sprintf("%d/%d\t".
                     "%s\t%s\t%d\t%d\t".
-                    "%.7f\t%d\t%d\n",
+                    "%.7f\t%d\n",
                     $albumid, $a->{albumorder}, 
                     $a->{performer}, $a->{name}, $a->{length}, $a->{trackid}, 
-                    ($a->{popularity} || 0), ($a->{rank} || 0));
+                    (defined($a->{popularity}) ? $a->{popularity} : 0), (defined($a->{rank}) ? $a->{rank} : 0));
             push(@r, $x);
         }
         $sth->finish;
