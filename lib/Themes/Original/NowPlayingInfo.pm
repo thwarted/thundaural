@@ -160,7 +160,11 @@ sub draw_info {
 
     my @lines = (@nowplaying, @timeleft, @queuedup, @mostrecent);
     if (! scalar @lines) {
-        push(@lines, " ", " ", " ", " ", "Browse albums and pick a track");
+        my $msg = "Browse albums and pick a track";
+        if ($main::client->albums_count() == 0) {
+            $msg = "Use the rip icon to add albums";
+        }
+        push(@lines, " ", " ", " ", " ", $msg);
         $somethingplaying = 0;
         $just = -1;
     }
