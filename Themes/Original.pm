@@ -23,6 +23,7 @@ use Themes::Original::AlbumsPage;
 use Themes::Original::TrackListing;
 use Themes::Original::RandomPlayPage;
 use Themes::Original::StatsPage;
+use Themes::Original::RipperPage;
 
 sub theme_initialize {
     my $this = shift;
@@ -42,6 +43,7 @@ sub theme_initialize {
     $this->add_widget(new Themes::Original::TrackListing(name=>'TrackListing'));
     $this->add_widget(new Themes::Original::RandomPlayPage(name=>'RandomPlayPage'));
     $this->add_widget(new Themes::Original::StatsPage(name=>'StatsPage'));
+    $this->add_widget(new Themes::Original::RipperPage(name=>'RipperPage'));
 
 }
 
@@ -49,7 +51,7 @@ sub start {
     my $this = shift;
 
     $this->SUPER::start();
-    $this->show_page('NowPlayingPage');
+    $this->show_page('AlbumsPage');
 }
 
 sub show_page {
