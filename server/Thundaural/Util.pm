@@ -1,7 +1,5 @@
 #!/usr/bin/perl
 
-# $Header: /home/cvs/thundaural/server/Thundaural/Util.pm,v 1.1 2004/05/22 06:39:36 jukebox Exp $
-
 package Thundaural::Util;
 
 # just some common routines
@@ -10,31 +8,31 @@ use strict;
 use warnings;
 
 sub tmpnameprefix {
-	my $storagedir = shift;
-	my $device = shift;
+    my $storagedir = shift;
+    my $device = shift;
 
-	my $cddx = $device;
-	$cddx =~ s/\W/_/g;
-	return sprintf('%s/newrip.device%s.', $storagedir, $cddx);
+    my $cddx = $device;
+    $cddx =~ s/\W/_/g;
+    return sprintf('%s/newrip.device%s.', $storagedir, $cddx);
 }
 
 sub mymktempname {
-	my $storagedir = shift;
-	my $device = shift;
-        my $purpose = shift;
+    my $storagedir = shift;
+    my $device = shift;
+    my $purpose = shift;
 
-        $purpose = "rand".int(rand(99999)) unless $purpose;
+    $purpose = "rand".int(rand(99999)) unless $purpose;
 
-        return sprintf('%spid%d.%s', &tmpnameprefix($storagedir, $device), $$, $purpose);
+    return sprintf('%spid%d.%s', &tmpnameprefix($storagedir, $device), $$, $purpose);
 }
 
 sub strcleanup {
-	my $str = shift;
+    my $str = shift;
 
-	$str =~ s/^\s+//g;
-	$str =~ s/\s+$//g;
-	$str =~ s/\s+/ /g;
-	return $str;
+    $str =~ s/^\s+//g;
+    $str =~ s/\s+$//g;
+    $str =~ s/\s+/ /g;
+    return $str;
 }
 
 1;
