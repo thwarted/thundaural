@@ -30,8 +30,9 @@ sub theme_initialize {
     my $this = shift;
 
     #$this->bgimage(new SDL::Surface(-name=>'images/1024x768-Appropriately-Left-Handed-1.png'));
-    #$this->bgimage(new SDL::Surface(-name=>'images/bgmetal2.png'));
-    $this->bgcolor(new SDL::Color(-r=>160, -g=>160, -b=>160));
+    $this->bgimage(new SDL::Surface(-name=>'images/fractalbroccoli.jpg'));
+    $this->bgimage(new SDL::Surface(-name=>'images/bgmetal2.png'));
+    #$this->bgcolor(new SDL::Color(-r=>160, -g=>160, -b=>160));
 
     $this->add_widget(new Themes::Original::AlbumsIcon(name=>'IconAlbums'));
     $this->add_widget(new Themes::Original::RandomPlayIcon(name=>'IconRandomPlay'));
@@ -96,10 +97,18 @@ sub heartbeat {
         $this->{lastalbumcount} = $x;
     }
 
+    my $devices = $main::client->devices('play');
+    my $maindev = shift @$devices;
+
     my $s = $main::client->status_of();
     my $playing = 0;
     my $ripping = 0;
     foreach my $dev (keys %$s) {
+        if ($dev eq $maindev) {
+            if (my $c = $this->get_widget('NowPlayingPage')->get_widget('songpause')) {
+                $c->frame($s->{$dev}->{state} eq 'paused');
+            }
+        }
         if ($s->{$dev}->{state} ne 'idle') {
             if ($s->{$dev}->{type} eq 'play') {
                 $playing++;
