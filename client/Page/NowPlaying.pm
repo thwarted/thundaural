@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-# $Header: /home/cvs/thundaural/client/Page/NowPlaying.pm,v 1.6 2004/01/04 04:57:19 jukebox Exp $
+# $Header: /home/cvs/thundaural/client/Page/NowPlaying.pm,v 1.8 2004/01/16 09:33:29 jukebox Exp $
 
 package Page::NowPlaying;
 
@@ -12,6 +12,7 @@ use Logger;
 use Data::Dumper;
 
 $Data::Dumper::Indent = 0;
+$Data::Dumper::Sortkeys = 1;
 
 use SDL;
 use SDL::Constants;
@@ -56,7 +57,7 @@ sub new {
 	$this->{-canvas} = $o{-canvas};
 	die("canvas is not an SDL::Surface") if (!ref($this->{-canvas}) && !$this->{-canvas}->isa('SDL::Surface'));
 
-	$this->{-albums} = $o{-albums}; # new Albums(-server=>$this->{-server});
+	$this->{-albums} = $o{-albums};
 	die("passed argument for -albums not an Album object") if (!ref($this->{-albums}) && !$this->{-albums}->isa('Albums'));
 
 	$this->{-storagedir} = '/home/storage';

@@ -6,6 +6,10 @@ use warnings;
 
 use IO::Socket::INET;
 
+use SDL;
+use SDL::Constants;
+use SDL::Event;
+
 use Logger;
 
 sub new {
@@ -19,14 +23,19 @@ sub new {
 	my $port = $opts{-port} || 9000;
 	$this->{server} = $server;
 	$this->{port} = $port;
+
 	$this->{status} = {};
 	$this->{lasttrackref} = {};
+	$this->{stats} = {};
+
 	$this->{statuslastupdate} = 0;
 	$this->{queuedonlastupdate} = 0;
 	$this->{deviceslastupdate} = 0;
+	$this->{statslastupdate} = 0;
+
 	$this->{errorfunc} = $opts{-errorfunc};
 	$this->{recoveredfunc} = $opts{-recoveredfunc};
-	                                                                                                                                                    
+
 	$this->_ensureconnect();
 	$this->_clearinput();
 	return $this;
@@ -36,6 +45,7 @@ sub _ensureconnect {
 	my $this = shift;
 	if (!$this->{ihn} || !$this->{ihn}->connected()) {
 		my $try = 0;
+		eval { $this->{ihn}->shutdown(2); };
 		while (1) {
 			TRYCONNECT:
 			while (1) {
@@ -54,14 +64,16 @@ sub _ensureconnect {
 					&$f(sprintf("jukebox server (%s:%s)\nis not responding\n\nPlease wait...\n\ntry $try", 
 						$this->{server}, $this->{port}));
 				}
-				sleep 3;
-				{ # this should really be reworked to use common code that exists in package main
+				my $nowticks = SDL::App::ticks();
+				while(SDL::App::ticks() - $nowticks < 3000) { 
+					# this should really be reworked to use common code that exists in package main
 					my $event = new SDL::Event;
 					while ($event->poll()) {
 						my $type = $event->type();      # get event type
 						if ($type == SDL::SDL_QUIT) { Logger::logger("request quit"); exit; }
 						if ($type == SDL::SDL_KEYDOWN) { if ($event->key_name() eq 'q') { Logger::logger("exiting"); exit; } }
 					}
+					SDL::App::delay(0, 50);
 				}
 			}
 			my $h = $this->{ihn};
@@ -146,6 +158,22 @@ sub _populate_devices {
 	} else {
 		Logger::logger("unable to get device list from server, result was $d");
 		$this->{devices} = {};
+	}
+}
+
+sub _populate_stats {
+	my $this = shift;
+	return if ($this->{statslastupdate}+10 > time());
+	my $x = $this->_do_cmd('stats');
+	if (ref($x) eq 'ARRAY') {
+		$this->{stats} = {};
+		foreach my $l (@$x) {
+			$this->{stats}->{$l->{key}} = $l->{value};
+		}
+		$this->{statslastupdate} = time();
+	} else {
+		Logger::logger("unable to get stat info from server, result was $x");
+		$this->{stats} = {};
 	}
 }
 
@@ -237,6 +265,13 @@ sub playing_on {
 		$x = {};
 	}
 	return $x;
+}
+
+sub stats {
+	my $this = shift;
+
+	$this->_populate_stats();
+	return $this->{stats};
 }
 
 sub queued_on {

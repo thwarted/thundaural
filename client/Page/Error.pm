@@ -29,6 +29,9 @@ use Button;
 
 our @ISA = qw( Page );
 
+my $errormsgfont = '/usr/share/fonts/msfonts/georgia.ttf';
+my $errormsgfontsize = 20;
+
 sub new {
 	my $proto = shift;
 	my %o = @_;
@@ -41,8 +44,8 @@ sub new {
 	die("canvas is not an SDL::Surface") if (!ref($this->{-canvas}) && !$this->{-canvas}->isa('SDL::Surface'));
 
 	$this->{-font} = new SDL::TTFont(
-				-name=>'/usr/share/fonts/msfonts/georgia.ttf',
-				-size=>20,
+				-name=>$errormsgfont,
+				-size=>$errormsgfontsize,
 				-bg=>new SDL::Color(-r=>140,-g=>140,-b=>140),
 				-fg=>new SDL::Color(-r=>0,-g=>0,-b=>0)
 			);
@@ -87,7 +90,7 @@ sub update {
 	$this->widget('00-buttonerror')->frame(0);
 }
 
-sub now_viewing() {
+sub now_viewing {
 	&main::clear_screen();
 }
 

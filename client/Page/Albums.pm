@@ -41,7 +41,7 @@ sub new {
 	$this->{-canvas} = $o{-canvas};
 	die("canvas is not an SDL::Surface") if (!ref($this->{-canvas}) && !$this->{-canvas}->isa('SDL::Surface'));
 
-	$this->{-albums} = $o{-albums}; # new Albums(-server=>$this->{-server});
+	$this->{-albums} = $o{-albums};
 	die("passed argument for -albums not an Album object") if (!ref($this->{-albums}) && !$this->{-albums}->isa('Albums'));
 
 	$this->{-lastalbumoffset} = -1;
@@ -157,15 +157,14 @@ sub _adjust_albumoffset($) {
 	return if (!$count);
 
 	my $max = $count - $this->{-albumsperpage};
-	Logger::logger("count = $count, max = $max");
 
 	if ($amount =~ m/\./) {
-		Logger::logger("got $amount, assuming percentage");
+		#Logger::logger("got $amount, assuming percentage");
 		# we were passed a percentage rather than a relative amount
 		$this->{-lastalbumoffset} = $this->{-albumoffset};
 		$this->{-albumoffset} = $count * $amount;
 	} else {
-		Logger::logger("got $amount, assuming relative");
+		#Logger::logger("got $amount, assuming relative");
 		$this->{-lastalbumoffset} = $this->{-albumoffset};
 		$this->{-albumoffset} += $amount;
 	}

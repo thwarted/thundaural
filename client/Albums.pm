@@ -1,7 +1,7 @@
 
 package Albums;
 
-# $Header: /home/cvs/thundaural/client/Albums.pm,v 1.5 2004/01/09 07:21:03 jukebox Exp $
+# $Header: /home/cvs/thundaural/client/Albums.pm,v 1.6 2004/01/17 23:24:46 jukebox Exp $
 
 use strict;
 use warnings;
@@ -29,7 +29,7 @@ sub _populate {
 
 	return if ($this->{albums} && $this->{nextupdate} > time());
 
-	Logger::logger("%d > %d", $this->{nextupdate}, time());
+	#Logger::logger("%d > %d", $this->{nextupdate}, time());
 	my $x = $this->{iCon}->getlist("albums");
 	if (ref($x) eq 'ARRAY') {
 		$this->{albums} = {};

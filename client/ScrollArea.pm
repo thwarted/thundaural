@@ -1,7 +1,7 @@
 
 package ScrollArea;
 
-# $Header: /home/cvs/thundaural/client/ScrollArea.pm,v 1.2 2003/12/27 10:46:18 jukebox Exp $
+# $Header: /home/cvs/thundaural/client/ScrollArea.pm,v 1.3 2004/01/17 23:23:51 jukebox Exp $
 
 use strict;
 use SDL::Surface;
@@ -98,7 +98,7 @@ sub scrollbypage {
 	my $oldoffset = $this->{-offset};
 	my $newoffset = $this->_normalize($oldoffset + ($pages * $this->{-pagesize}));
 	if ($oldoffset != $newoffset) {
-		Logger::logger("scrolling by page from $oldoffset to $newoffset");
+		#Logger::logger("scrolling by page from $oldoffset to $newoffset");
 		$this->_scrollto($oldoffset, $newoffset);
 	}
 	0;
@@ -111,7 +111,7 @@ sub scrollbypixels {
 	my $oldoffset = $this->{-offset};
 	my $newoffset = $this->_normalize($oldoffset + $amount);
 	if ($oldoffset != $newoffset) {
-		Logger::logger("scrolling by pixel from $oldoffset to $newoffset");
+		#Logger::logger("scrolling by pixel from $oldoffset to $newoffset");
 		$this->_scrollto($oldoffset, $newoffset);
 	}
 	0;
@@ -136,7 +136,7 @@ sub _normalize {
 	my $this = shift;
 	my $offset = shift;
 
-	Logger::logger("height = ".$this->{-content}->height.", scrolluntil = ".$this->{-scrolluntil});
+	#Logger::logger("height = ".$this->{-content}->height.", scrolluntil = ".$this->{-scrolluntil});
 	if ($this->{-scrolluntil} != $this->{-content}->height) {
 		my $realheight = $this->{-content}->height / 2;
 		if ($offset <= 0) {

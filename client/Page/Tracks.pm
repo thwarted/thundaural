@@ -34,7 +34,7 @@ my $titlefontsize = 21;
 my $aifont = new SDL::TTFont(-name=>$titlefontfile, -size=>17, -bg=>new SDL::Color(-r=>196,-g=>160,-b=>160), -fg=>new SDL::Color(-r=>0,-g=>0,-b=>0));
 my $titlefont = new SDL::TTFont(-name=>$titlefontfile, -size=>$titlefontsize, -bg=>new SDL::Color(-r=>160,-g=>160,-b=>160), -fg=>new SDL::Color(-r=>0,-g=>0,-b=>0));
 
-my $trackfontfile = "./fonts/GillSans.ttf";
+my $trackfontfile = "/usr/share/fonts/msfonts/arial.ttf";
 my $trackfontsize = 35;
 my $trackfont = new SDL::TTFont(-name=>$trackfontfile, -size=>$trackfontsize, -bg=>new SDL::Color(-r=>160,-g=>160,-b=>160), -fg=>new SDL::Color(-r=>0,-g=>0,-b=>0));
 my $trackfontsmall = new SDL::TTFont(-name=>$trackfontfile, -size=>$trackfontsize*.75, -bg=>new SDL::Color(-r=>160,-g=>160,-b=>160), -fg=>new SDL::Color(-r=>0,-g=>0,-b=>0));
@@ -62,7 +62,7 @@ sub new {
 	$this->{-canvas} = $o{-canvas};
 	die("canvas is not an SDL::Surface") if (!ref($this->{-canvas}) && !$this->{-canvas}->isa('SDL::Surface'));
 
-	$this->{-albums} = $o{-albums}; # new Albums(-server=>$this->{-server});
+	$this->{-albums} = $o{-albums};
 	die("passed argument for -albums not an Album object") if (!ref($this->{-albums}) && !$this->{-albums}->isa('Albums'));
 
 	$this->{-imgsurfaces}->{arrow_down_white} = new SDL::Surface(-name=>'./images/arrow-down-white.png');
@@ -93,26 +93,30 @@ sub _make {
 			-mask=>new SDL::Rect(-width=>150, -height=>50, -x=>10, -y=>400)
 			);
 	my $outputs = $this->{-server}->devices('play');
-	my $first;
-	foreach my $o (@$outputs) {
-		my $x = new SDL::Surface(-width=>150, -height=>50);
-		$x->display_format();
-		$x->fill(0, new SDL::Color(-r=>140, -g=>140, -b=>140));
-		my $fw = $tinfofont->width($o);
-		my $fh = $tinfofont->height();
-		$tinfofont->print($x, ((150-$fw)/2), ((50-$fh)/3)*2, $o);
-		$nexttfont->print($x, 2, 2, "play to...");
-		$output->surface($o, $x);
-		$first = $o if (!$first);
+	if (scalar(@$outputs) > 1) {
+		my $first;
+		foreach my $o (@$outputs) {
+			my $x = new SDL::Surface(-width=>150, -height=>50);
+			$x->display_format();
+			$x->fill(0, new SDL::Color(-r=>140, -g=>140, -b=>140));
+			my $fw = $tinfofont->width($o);
+			my $fh = $tinfofont->height();
+			$tinfofont->print($x, ((150-$fw)/2), ((50-$fh)/3)*2, $o);
+			$nexttfont->print($x, 2, 2, "play to...");
+			$output->surface($o, $x);
+			$first = $o if (!$first);
+		}
+		$output->on_interior_event(SDL::SDL_MOUSEBUTTONDOWN, sub {
+				$this->{-channel} = $this->cycle_outputs($this->{-channel});
+				$output->draw($this->{-channel});
+				Logger::logger("will queue new tracks on %s", $this->{-channel});
+			} );
+		$output->frame($first);
+		$this->{-channel} = $first;
+		$this->add_widget($output);
+	} else {
+		$this->{-channel} = $outputs->[0];
 	}
-	$output->on_interior_event(SDL::SDL_MOUSEBUTTONDOWN, sub {
-			$this->{-channel} = $this->cycle_outputs($this->{-channel});
-			$output->draw($this->{-channel});
-			Logger::logger("will queue new tracks on %s", $this->{-channel});
-		} );
-	$output->frame($first);
-	$this->{-channel} = $first;
-	$this->add_widget($output);
 
 	my $albumpic = new Button(
 			-name=>'00-albumcover',
@@ -139,15 +143,20 @@ sub _make {
 	$this->add_widget($albumtitle);
 
 	my $basesize = $trackfont->height + $tinfofont->height;
+	my $xx1 = $this->{-rect}->height() / $basesize;
+	$xx1 = int($xx1) - 1;
+	my $tlheight = $basesize * $xx1;
+	#Logger::logger("lines = $xx1, tlheight = $tlheight");
 	my $tracklist = new ScrollArea(
 			-name=>'00-tracklist',
 			-canvas=>$this->{-canvas},
 			-content=>new SDL::Surface(-width=>10, -height=>10),
 			-width=>704,
-			-height=>$basesize * 9, # make sure this fits on the screen!
+			#-height=>$basesize * 9, # make sure this fits on the screen!
+			-height=>$tlheight,
 			-x=>220,
 			-y=>$topline+($titlefont->height*2)+10,
-			-pagesize=>($trackfont->height+$tinfofont->height),
+			-pagesize=>$basesize
 			);
 	$tracklist->predraw( sub { &main::draw_background($this->widget('00-tracklist')->mask(), $this->{-canvas}); } );
 	$tracklist->on_interior_event(SDL::SDL_MOUSEBUTTONDOWN, sub { 
@@ -235,11 +244,15 @@ sub now_viewing {
 	# draw top line
 	#$aitit->fill(new SDL::Rect(-width=>1004,-height=>2,-x=>0,-y=>0), new SDL::Color(-r=>255, -g=>0, -b=>0));
 	# draw bottom line
-	$aitit->fill(new SDL::Rect(-width=>1004,-height=>2,-x=>0,-y=>($titlefont->height*2)-1), new SDL::Color(-r=>255, -g=>0, -b=>0));
+	#$aitit->fill(new SDL::Rect(-width=>1004,-height=>2,-x=>0,-y=>($titlefont->height*2)-1), new SDL::Color(-r=>255, -g=>0, -b=>0));
 	my $line = 0;
 	my @titlelines = ( $al->name(), $al->performer() );
 	foreach my $string ( @titlelines ) {
-		$titlefont->print($aitit, 10, $line*($titlefont->height), $string || " ");
+		if ($string) {
+			my $w = $titlefont->width($string);
+			my $xpos = (1004 - $w) / 2;
+			$titlefont->print($aitit, $xpos, $line*($titlefont->height), $string);
+		}
 		$line++;
 	}
 	$this->widget('00-albumtitle')->surface(0, $aitit);
@@ -284,6 +297,7 @@ sub now_viewing {
 				$trackfont->print($trlcon, 0,  $line*$basesize, $string);
 			} else {
 				$trackfontsmall->print($trlcon, 0, $line*$basesize+($trackfont->height *.13), $string);
+				#$trackfontsmall->print($trlcon, 0, $line*$basesize, $string);
 			}
 		};
 		eval {

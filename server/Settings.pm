@@ -15,11 +15,11 @@ my $_devices = {
 		'play'=>'/dev/dsp',
 		'mixer'=>'/dev/mixer',
 		},
-	'backup'=>{
-		'_order'=>2,
-		'play'=>'/dev/dsp1',
-		'mixer'=>'/dev/mixer1',
-		},
+#	'backup'=>{
+#		'_order'=>2,
+#		'play'=>'/dev/dsp1',
+#		'mixer'=>'/dev/mixer1',
+#		},
 	'cdrom'=>{
 		'_order'=>1,
 		'read'=>'/dev/cdrom',

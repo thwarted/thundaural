@@ -15,7 +15,7 @@ use Logger;
 
 my $BIN_DF = '/bin/df';
 
-# $Header: /home/cvs/thundaural/server/ServerCommands.pm,v 1.8 2004/01/09 07:06:47 jukebox Exp $
+# $Header: /home/cvs/thundaural/server/ServerCommands.pm,v 1.10 2004/01/16 09:35:37 jukebox Exp $
 
 my @cmds = sort qw/pause skip tracks queued devices play albums quit help noop volume status who name rip abort stats/;
 
@@ -166,9 +166,9 @@ sub cmd_stats {
 		#/dev/hda8             32589620   7906656  23027468  26% /home
 		my $x = pop @x;
 		@x = split(/\s+/, $x);
-		$v{storagetotal} = int($x[1]);
-		$v{storageused} = int($x[2]);
-		$v{storageavailable} = int($x[3]);
+		$v{storagetotal} = int($x[1])*1024;
+		$v{storageused} = int($x[2])*1024;
+		$v{storageavailable} = int($x[3])*1024;
 		$x = $x[4]; $x =~ s/\D//g;
 		$v{storagepercentagefull} = int($x);
 	};
@@ -269,6 +269,7 @@ sub _parse_aumix_output {
 	my @x = `$cmd 2>/dev/null`;
 	chomp @x;
 	@x = grep /^vol /, @x; # should only return one line
+	return 0 if (!@x);
 	my $vs = shift @x; # even if it doesn't, take the first one
 	@x = split(/[,\s]+/, $vs);
 	shift @x; # vol

@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-# $Header: /home/cvs/thundaural/client/interface.pl,v 1.8 2004/01/09 05:54:07 jukebox Exp $
+# $Header: /home/cvs/thundaural/client/interface.pl,v 1.11 2004/01/17 23:33:50 jukebox Exp $
 
 use strict;
 use warnings;
@@ -8,27 +8,8 @@ use warnings;
 our ($dbh);
 our ($iCon);
 our ($Albums);
-my $bin_logger = '/usr/bin/logger';
 
-#my $usefont = "/tmp/sdltest/electrohar.ttf";
-#my $usefont = "/tmp/sdltest/aircut3.ttf";
-#my $usefont = "/usr/X11R6/lib/X11/fonts/TTF/luximb.ttf";
-#my $usefont = "/usr/share/fonts/msfonts/comic.ttf";
-#my $usefont = "/usr/share/fonts/msfonts/tahoma.ttf";
-my $debugfontfile = "/usr/share/fonts/msfonts/arialbd.ttf";
-my $titlefontfile = "/usr/share/fonts/msfonts/georgia.ttf";
-my $titlefontsize = 21;
-my $trackfontfile = "/usr/share/fonts/msfonts/georgia.ttf";
-my $trackfontsize = 35;
-my $tinfofontfile = "/usr/share/fonts/msfonts/georgia.ttf";
-my $tinfofontsize = 20;
-my $nexttfontfile = "/usr/share/fonts/msfonts/georgia.ttf";
-my $nexttfontsize = 14;
-my $progressfontfile = "/usr/share/fonts/msfonts/arial.ttf";
-my $progressfontsize = 14;
-#my $nexttfontfile = "/usr/share/fonts/msfonts/georgia.ttf";
-
-my $usesize = 15;
+my $xscreensaver_start = 'xscreensaver-command -activate';
 
 my $WIN_X = 1024;
 my $WIN_Y = 768;
@@ -56,42 +37,26 @@ use Track;
 use Albums;
 use Album;
 
-# interface related stuff
+# interface widgets
 use EventReceiver;
 use Button;
 use ScrollArea;
 use ProgressBar;
 
+# interface screens/pages
+use Page::Stats;
 use Page::Error;
 use Page::Albums;
-use Page::OldIdle;
 use Page::Tracks;
 use Page::Ripping;
 use Page::NowPlaying;
 
-our $E_SHOWALBUMS=SDL::SDLK_QUOTE;
-our $E_SHOWTRACKS=SDL::SDLK_QUOTEDBL;
-our $E_SHOWIDLE=SDL::SDLK_SEMICOLON;
-our $E_SHOWERROR=SDL::SDLK_HASH;
+# until user-defined events are working in SDL_perl
 our $E_CALLFUNCS=SDL::SDLK_BACKSPACE;
 our $E_UPDATESTATUS=SDL::SDLK_COLON;
 our $E_ANIMATE=SDL::SDLK_AT;
 
-my $debugfont = new SDL::TTFont(-name=>$debugfontfile, -size=>13, -bg=>new SDL::Color(-r=>255,-g=>255,-b=>255), -fg=>new SDL::Color(-r=>0,-g=>0,-b=>0));
-my $aifont = new SDL::TTFont(-name=>$titlefontfile, -size=>17, -bg=>new SDL::Color(-r=>196,-g=>160,-b=>160), -fg=>new SDL::Color(-r=>0,-g=>0,-b=>0));
-my $titlefont = new SDL::TTFont(-name=>$titlefontfile, -size=>$titlefontsize, -bg=>new SDL::Color(-r=>160,-g=>160,-b=>160), -fg=>new SDL::Color(-r=>0,-g=>0,-b=>0));
-my $trackfont = new SDL::TTFont(-name=>$trackfontfile, -size=>$trackfontsize, -bg=>new SDL::Color(-r=>160,-g=>160,-b=>160), -fg=>new SDL::Color(-r=>0,-g=>0,-b=>0));
-my $trackfontsmall = new SDL::TTFont(-name=>$trackfontfile, -size=>$trackfontsize*.75, -bg=>new SDL::Color(-r=>160,-g=>160,-b=>160), -fg=>new SDL::Color(-r=>0,-g=>0,-b=>0));
-my $tinfofont = new SDL::TTFont(-name=>$tinfofontfile, -size=>$tinfofontsize, -bg=>new SDL::Color(-r=>160,-g=>160,-b=>160), -fg=>new SDL::Color(-r=>0,-g=>0,-b=>0));
-my $nexttfont = new SDL::TTFont(-name=>$nexttfontfile, -size=>$nexttfontsize, -bg=>new SDL::Color(-r=>160,-g=>160,-b=>160), -fg=>new SDL::Color(-r=>0,-g=>0,-b=>0));
-my $mostrecfont = new SDL::TTFont(-name=>$nexttfontfile, -size=>$nexttfontsize, -bg=>new SDL::Color(-r=>160,-g=>160,-b=>160), -fg=>new SDL::Color(-r=>255,-g=>255,-b=>255));
-my $progressfont = new SDL::TTFont(-name=>$progressfontfile, -size=>$progressfontsize, -bg=>new SDL::Color(-r=>140,-g=>140,-b=>140), -fg=>new SDL::Color(-r=>32,-g=>32,-b=>32));
-my $volumefont = new SDL::TTFont(-name=>$progressfontfile, -size=>$progressfontsize, -bg=>new SDL::Color(-r=>140,-g=>140,-b=>140), -fg=>new SDL::Color(-r=>32,-g=>32,-b=>32));
-
-my $app = &setup($WIN_X, $WIN_Y);
-my $imgsurfaces = {};
-#$imgsurfaces->{bg} = new SDL::Surface(-name=>'./images/bgfractalbroccoli.png');
-$imgsurfaces->{bg} = new SDL::Surface(-name=>'./images/bgmetal2.png');
+our $app = &setup($WIN_X, $WIN_Y);
 
 my $menuarea = new SDL::Rect(-width=>$WIN_X, -height=>98, -x=>0, -y=>0);
 my $pagearea = new SDL::Rect(-width=>$WIN_X, -height=>$WIN_Y-94, -x=>0, -y=>98);
@@ -102,38 +67,14 @@ my $state = {
 	ripping_track=>'',
 };
 
+my $imgsurfaces = &load_images;
+
 my $pages = {};
-$pages->{'error'} = new Page::Error(-canvas=>$app, -rect=>$pagearea, -appstate=>$state),
-
-$iCon = new ClientCommands(-errorfunc=>\&show_error_message, -recoveredfunc=>\&eatevents);
-$Albums = new Albums(-server=>$iCon);
-
-$pages->{'albums'} = new Page::Albums(-server=>$iCon, -canvas=>$app, -rect=>$pagearea, -appstate=>$state, -albums=>$Albums);
-$pages->{'tracks'} = new Page::Tracks(-server=>$iCon, -canvas=>$app, -rect=>$pagearea, -appstate=>$state, -albums=>$Albums);
-#$pages->{'oldidle'} = new Page::OldIdle(-server=>$iCon, -canvas=>$app, -rect=>$pagearea, -appstate=>$state, -albums=>$Albums);
-$pages->{'ripping'} = new Page::Ripping(-server=>$iCon, -canvas=>$app, -rect=>$pagearea, -appstate=>$state, -albums=>$Albums);
-$pages->{'idle'} = new Page::NowPlaying(-server=>$iCon, -canvas=>$app, -rect=>$pagearea, -appstate=>$state, -albums=>$Albums);
-
-
-               #$imgsurfaces->{speaker} = new SDL::Surface(-name=>'./images/speaker.png');
-       $imgsurfaces->{goto_nowplaying} = new SDL::Surface(-name=>"./images/goto-nowplaying.png");
-           $imgsurfaces->{goto_albums} = new SDL::Surface(-name=>'./images/goto-albums.png');
-     $imgsurfaces->{start_screensaver} = new SDL::Surface(-name=>"./images/start-screensaver03.png");
-       $imgsurfaces->{'ripcdrom-busy'} = new SDL::Surface(-name=>'./images/ripcdrom-busy.png');
-       $imgsurfaces->{'ripcdrom-idle'} = new SDL::Surface(-name=>'./images/ripcdrom-idle.png');
-
-        $imgsurfaces->{'nowplaying-0'} = new SDL::Surface(-name=>'./images/nowplaying-speaker0.png');
-        $imgsurfaces->{'nowplaying-1'} = new SDL::Surface(-name=>'./images/nowplaying-speaker1.png');
-        $imgsurfaces->{'nowplaying-2'} = new SDL::Surface(-name=>'./images/nowplaying-speaker2.png');
-        $imgsurfaces->{'nowplaying-3'} = new SDL::Surface(-name=>'./images/nowplaying-speaker3.png');
-        $imgsurfaces->{'nowplaying-4'} = new SDL::Surface(-name=>'./images/nowplaying-speaker4.png');
-        $imgsurfaces->{'nowplaying-5'} = new SDL::Surface(-name=>'./images/nowplaying-speaker5.png');
-        $imgsurfaces->{'nowplaying-6'} = new SDL::Surface(-name=>'./images/nowplaying-speaker6.png');
-
-my $callfuncs = [];
+&setup_pages;
 
 my $menuwidgets = &make_menu_widgets;
-#&draw_widgets;
+
+my $callfuncs = [];
 
 my $totalevents = 0;
 my $ticks = {};
@@ -192,7 +133,7 @@ sub mainloop {
 				my $sub = shift @$callfuncs;
 				&$sub;
 			}
-			Logger::logger("E_CALLFUNCS: called $funccount subs");
+			#Logger::logger("E_CALLFUNCS: called $funccount subs");
 			next;
 		}
 
@@ -260,39 +201,13 @@ sub show_error_message {
 	my $errormsg = shift;
 	my $cp = $state->{current_page};
 	$state->{current_page} = 'error';
+	Logger::logger("state = ".($state->{current_page}));
 	$pages->{$state->{current_page}}->now_viewing(); # notify the page it's being viewed
 	$pages->{$state->{current_page}}->update($errormsg);
 	$pages->{$state->{current_page}}->draw();
 	$app->sync;
 	$state->{current_page} = $cp;
 	$state->{last_page} = 'error';
-}
-
-sub make_page_error {
-	my $errormsg = shift;
-	my $buttonerror = new Button(
-			-name=>'buttonerror',
-			-canvas=>$app,
-			-bg=>new SDL::Color(-r=>140, -g=>140, -b=>140),
-			-mask=>new SDL::Rect(-width=>500,-height=>500, -x=>($WIN_X-500)/2, -y=>($WIN_Y-500)/2)
-			);
-	my $x = new SDL::Surface(-width=>500, -height=>500);
-	$x->display_format();
-	$x->fill(0, new SDL::Color(-r=>140,-g=>140,-b=>140));
-	my $fh = $tinfofont->height;
-	my @lines = split(/\n/, $errormsg);
-	my $lpos = $fh;
-	foreach my $l (@lines) {
-		my $fw = $tinfofont->width($l);
-		if ($fw) {
-			$tinfofont->print($x, ((500-$fw)/2), $lpos, $l);
-		}
-		$lpos += $fh;
-	}
-	$buttonerror->surface(0, $x);
-	$buttonerror->frame(0);
-	
-	return {'00-buttonerror'=>$buttonerror};
 }
 
 sub make_menu_widgets {
@@ -326,18 +241,7 @@ sub make_menu_widgets {
 				} );
 		$gotoidle->on_interior_event(SDL::SDL_MOUSEBUTTONDOWN, sub { $state->{current_page} = 'idle'; } );
 	}
-#	my $ni = new Button(
-#			-name=>"oldidle",
-#			-canvas=>$app,
-#			-bg=>$bgcolor,
-#			-mask=>new SDL::Rect(-width=>90, -height=>90, -x=>270, -y=>1)
-#		);
-#	{
-#		$ni->predraw( sub { &main::draw_background($ni->mask(), $app); } );
-#		$ni->surface(2, $imgsurfaces->{'nowplaying-2'});
-#		$ni->frame(2);
-#		$ni->on_interior_event(SDL::SDL_MOUSEBUTTONDOWN, sub { $state->{current_page} = 'oldidle'; } );
-#	}
+
 	my $gotoalbums = new Button(
                 	-name=>'gotoalbums',
                 	-canvas=>$app,
@@ -345,20 +249,21 @@ sub make_menu_widgets {
                 	-mask=>new SDL::Rect(-width=>90,-height=>90, -x=>160, -y=>2)
                 	);
 	{
-        	$gotoalbums->surface(0, $imgsurfaces->{goto_albums});
+        	$gotoalbums->surface(0, $imgsurfaces->{'goto_albums'});
 		$gotoalbums->on_interior_event(SDL::SDL_MOUSEBUTTONDOWN, sub { $state->{current_page} = 'albums'; } );
 	}
-	my $screensaver = new Button(
-			-name=>'screensaver',
+
+	my $st = new Button(
+			-name=>"stats",
 			-canvas=>$app,
 			-bg=>$bgcolor,
-			-mask=>new SDL::Rect(-width=>48,-height=>48,-x=>1024-50,-y=>2)
-			);
+			-mask=>new SDL::Rect(-width=>90, -height=>90, -x=>820-90-10, -y=>1)
+		);
 	{
-		#$x->set_alpha(SDL_SRCALPHA, 128);
-		$screensaver->surface(0, $imgsurfaces->{start_screensaver});
-		$screensaver->frame(0);
-		$screensaver->on_interior_event(SDL::SDL_MOUSEBUTTONDOWN, \&start_screensaver);
+		$st->predraw( sub { &main::draw_background($st->mask(), $app); } );
+		$st->surface(0, $imgsurfaces->{'goto_stats'});
+		$st->frame(0);
+		$st->on_interior_event(SDL::SDL_MOUSEBUTTONDOWN, sub { $state->{current_page} = 'stats'; } );
 	}
 
 	my $gotoripping = new Button(
@@ -382,8 +287,20 @@ sub make_menu_widgets {
 				} );
 	}
 
+	my $screensaver = new Button(
+			-name=>'screensaver',
+			-canvas=>$app,
+			-bg=>$bgcolor,
+			-mask=>new SDL::Rect(-width=>48,-height=>48,-x=>1024-50,-y=>2)
+			);
+	{
+		$screensaver->surface(0, $imgsurfaces->{'start_screensaver'});
+		$screensaver->frame(0);
+		$screensaver->on_interior_event(SDL::SDL_MOUSEBUTTONDOWN, \&start_screensaver);
+	}
+
 	return {'00-screensaver'=>$screensaver,
-		#'00-ni'=>$ni,
+		'00-stats'=>$st,
 		'00-gotoalbums'=>$gotoalbums,
 		'00-gotoripping'=>$gotoripping,
 		'00-gotoidle'=>$gotoidle};
@@ -414,44 +331,6 @@ sub min {
 	return $x;
 }
 
-#sub changepage {
-#	my $page = shift;
-#	my $e = new SDL::Event;
-#	if ($page eq 'albums') {
-#		$e->settype($E_SHOWALBUMS);
-#	} elsif ($page eq 'tracks') {
-#		$e->settype($E_SHOWTRACKS);
-#	} else {
-#		$e->settype($E_SHOWIDLE);
-#	}
-#	my $x = $e->push;
-#}
-
-sub draw_debug_line {
-	my $event = shift;
-	my $x = new SDL::Rect(-width=>1024, -height=>16, -x=>0, -y=>0);
-	$app->fill($x, new SDL::Color(-r=>255,-g=>255,-b=>255));
-	$debugfont->print(
-			$app,
-			1,
-			0,
-		sprintf("event type %d received at %d location %dx%d", $event->type(), $app->ticks(), $event->motion_x(), $event->motion_y())
-		);
-}
-
-sub dbconnect {
-	my $db_database = 'jukebox';
-	my $db_hostname = 'jukebox';
-	my $db_port = 3306;
-	my $db_user = 'jukebox';
-	my $db_pass = 'jukebox';
-	my $db_dsn = "DBI:mysql:database=$db_database;host=$db_hostname;port=$db_port";
-
-	my $dbh = DBI->connect($db_dsn, $db_user, $db_pass, {'RaiseError' => 1, 'PrintError'=>1});
-	$dbh->trace(1);
-	return $dbh;
-}
-
 sub setup {
 	my ($x, $y) = @_;
 	my $app = new SDL::App( -title => 'Jukebox',
@@ -468,45 +347,6 @@ sub setup {
 		SDL::Cursor::show(0);
 	}
 	return $app;
-}
-
-sub adjust_albumoffset($$) {
-	my $offset = shift;
-	my $amount = shift;
-	my $count = $Albums->count;
-	my $max = $count - $state->{albumsperpage};
-
-	$state->{lastalbumoffset} = $offset;
-	$offset += $amount;
-
-	if ($offset < 0) {
-		return 0;
-	}
-	if ($offset > $max) {
-		return $max;
-	}
-	return $offset;
-}
-
-sub english_rank {
-	my $rank = shift;
-
-	return $rank if (!$rank);
-
-	return "first" if ($rank == 1);
-	return "second" if ($rank == 2);
-	return "third" if ($rank == 3);
-	return "fourth" if ($rank == 4);
-	return "fifth" if ($rank == 5);
-	return "sixth" if ($rank == 6);
-	return "seventh" if ($rank == 7);
-	return "eighth" if ($rank == 8);
-	return "ninth" if ($rank == 9);
-	return "tenth" if ($rank == 10);
-	return $rank."st" if ($rank =~ m/1$/);
-	return $rank."nd" if ($rank =~ m/2$/);
-	return $rank."rd" if ($rank =~ m/3$/);
-	return $rank."th";
 }
 
 sub sectotime {
@@ -535,7 +375,7 @@ sub sectotime {
 
 sub start_screensaver {
 	$state->{current_page} = 'albums';
-	system("/usr/local/bin/xscreensaver-command -activate");
+	system("$xscreensaver_start > /dev/null 2>/dev/null");
 }
 
 sub printmem {
@@ -551,13 +391,91 @@ sub AUTOLOAD {
 
 	my($p, $f, $l) = caller;
 	our $AUTOLOAD;
-	Logger::logger("attempt to call \"$AUTOLOAD\" by $p ($f:$l)\n");
+	Logger::logger("attempt to call \"$AUTOLOAD\" by $p ($f:$l) THIS IS A BUG SHOULD NEVER HAPPEN!\n");
 	0;
+}
+
+sub setup_pages {
+	$pages->{'error'} = new Page::Error(-canvas=>$app, -rect=>$pagearea, -appstate=>$state),
+
+	$iCon = new ClientCommands(-errorfunc=>\&show_error_message, -recoveredfunc=>\&eatevents);
+	$Albums = new Albums(-server=>$iCon);
+
+	$pages->{'albums'} = new Page::Albums(-server=>$iCon, -canvas=>$app, -rect=>$pagearea, -appstate=>$state, -albums=>$Albums);
+	$pages->{'tracks'} = new Page::Tracks(-server=>$iCon, -canvas=>$app, -rect=>$pagearea, -appstate=>$state, -albums=>$Albums);
+	$pages->{'idle'} = new Page::NowPlaying(-server=>$iCon, -canvas=>$app, -rect=>$pagearea, -appstate=>$state, -albums=>$Albums);
+	$pages->{'stats'} = new Page::Stats(-server=>$iCon, -canvas=>$app, -rect=>$pagearea, -appstate=>$state);
+	$pages->{'ripping'} = new Page::Ripping(-server=>$iCon, -canvas=>$app, -rect=>$pagearea, -appstate=>$state);
+}
+
+sub load_images {
+	my $imgsurfaces;
+	          $imgsurfaces->{'bg'} = new SDL::Surface(-name=>'./images/bgmetal2.png');
+               #$imgsurfaces->{speaker} = new SDL::Surface(-name=>'./images/speaker.png');
+     $imgsurfaces->{'goto_nowplaying'} = new SDL::Surface(-name=>"./images/goto-nowplaying.png");
+         $imgsurfaces->{'goto_albums'} = new SDL::Surface(-name=>'./images/goto-albums.png');
+          $imgsurfaces->{'goto_stats'} = new SDL::Surface(-name=>'./images/goto-stats.png');
+   $imgsurfaces->{'start_screensaver'} = new SDL::Surface(-name=>"./images/start-screensaver03.png");
+       $imgsurfaces->{'ripcdrom-busy'} = new SDL::Surface(-name=>'./images/ripcdrom-busy.png');
+       $imgsurfaces->{'ripcdrom-idle'} = new SDL::Surface(-name=>'./images/ripcdrom-idle.png');
+
+        $imgsurfaces->{'nowplaying-0'} = new SDL::Surface(-name=>'./images/nowplaying-speaker0.png');
+        $imgsurfaces->{'nowplaying-1'} = new SDL::Surface(-name=>'./images/nowplaying-speaker1.png');
+        $imgsurfaces->{'nowplaying-2'} = new SDL::Surface(-name=>'./images/nowplaying-speaker2.png');
+        $imgsurfaces->{'nowplaying-3'} = new SDL::Surface(-name=>'./images/nowplaying-speaker3.png');
+        $imgsurfaces->{'nowplaying-4'} = new SDL::Surface(-name=>'./images/nowplaying-speaker4.png');
+        $imgsurfaces->{'nowplaying-5'} = new SDL::Surface(-name=>'./images/nowplaying-speaker5.png');
+        $imgsurfaces->{'nowplaying-6'} = new SDL::Surface(-name=>'./images/nowplaying-speaker6.png');
+	return $imgsurfaces;
 }
 
 1;
 
 __END__ 
+
+#my $debugfontfile = "/usr/share/fonts/msfonts/arialbd.ttf";
+#my $debugfont = new SDL::TTFont(-name=>$debugfontfile, -size=>13, -bg=>new SDL::Color(-r=>255,-g=>255,-b=>255), -fg=>new SDL::Color(-r=>0,-g=>0,-b=>0));
+#sub draw_debug_line {
+#	my $event = shift;
+#	my $x = new SDL::Rect(-width=>1024, -height=>16, -x=>0, -y=>0);
+#	$app->fill($x, new SDL::Color(-r=>255,-g=>255,-b=>255));
+#	$debugfont->print(
+#			$app,
+#			1,
+#			0,
+#		sprintf("event type %d received at %d location %dx%d", $event->type(), $app->ticks(), $event->motion_x(), $event->motion_y())
+#		);
+#}
+#
+#sub dbconnect {
+#	my $db_database = 'jukebox';
+#	my $db_hostname = 'jukebox';
+#	my $db_port = 3306;
+#	my $db_user = 'jukebox';
+#	my $db_pass = 'jukebox';
+#	my $db_dsn = "DBI:mysql:database=$db_database;host=$db_hostname;port=$db_port";
+#
+#	my $dbh = DBI->connect($db_dsn, $db_user, $db_pass, {'RaiseError' => 1, 'PrintError'=>1});
+#	$dbh->trace(1);
+#	return $dbh;
+#}
+
+#our $E_SHOWALBUMS=SDL::SDLK_QUOTE;
+#our $E_SHOWTRACKS=SDL::SDLK_QUOTEDBL;
+#our $E_SHOWIDLE=SDL::SDLK_SEMICOLON;
+#our $E_SHOWERROR=SDL::SDLK_HASH;
+#sub changepage {
+#	my $page = shift;
+#	my $e = new SDL::Event;
+#	if ($page eq 'albums') {
+#		$e->settype($E_SHOWALBUMS);
+#	} elsif ($page eq 'tracks') {
+#		$e->settype($E_SHOWTRACKS);
+#	} else {
+#		$e->settype($E_SHOWIDLE);
+#	}
+#	my $x = $e->push;
+#}
 
 #    $imgsurfaces->{button_next_raised} = new SDL::Surface(-name=>'./images/button-next-raised.gif');
 # $imgsurfaces->{button_next_depressed} = new SDL::Surface(-name=>'./images/button-next-depressed.gif');

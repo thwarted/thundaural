@@ -1,0 +1,270 @@
+#!/usr/bin/perl
+
+# $Header: /home/cvs/thundaural/checkdeps,v 1.1 2004/01/17 23:26:49 jukebox Exp $
+
+# just a little quick and dirty script to help you make sure you have all the 
+# dependancies installed.  It should really be better than this.  lots of code 
+# duplication here
+
+# and it should really generate settings/config files for the optional portions
+
+$| = 1;
+
+my $check_client = 0;
+my $check_server = 0;
+my $softfail = 0;
+
+my $prfailed = 0;
+
+while(@ARGV) {
+	my $a = shift (@ARGV);
+	if ($a =~ m/^--client/) {
+		$check_client = 1;
+		next;
+	}
+	if ($a =~ m/^--server/) {
+		$check_server = 1;
+		next;
+	}
+	if ($a =~ m/^--softfail/) {
+		$softfail = 1;
+		next;
+	}
+	die("$0: unknown option $a\nUsage: $0 [--client] [--server] [--softfail]\n");
+}
+
+if (!$check_client && !$check_server) {
+	$check_client = 1;
+	$check_server = 1;
+}
+
+sub mydie {
+	my $msg = shift;
+	if ($msg) {
+		$msg .= "\n" if ($msg !~ m/\n$/);
+		if ($softfail) {
+			warn("\n*** $msg");
+			$prfailed = 1;
+		} else {
+			die("\n*** $msg");
+		}
+	} else {
+		print " ok\n";
+	}
+}
+
+use Config;
+
+if ($check_server) {
+	print "\nChecking dependancies for server...\n";
+	&checking("threaded perl");
+	$Config{useithreads} or &mydie("this program requires a threaded perl (ithreads)\n");
+	&ok;
+
+	my @modules = qw/DBI File::Basename Socket IO::Socket IO::Socket::INET 
+	IO::Select IPC::Open2 threads threads::shared Thread::Queue DBD::SQLite/;
+
+	foreach my $mod (@modules) {
+		&checking('perl module', $mod);
+		&havemodule($mod) or &mydie("unable to locate module $mod");
+		&ok;
+	}
+
+	my %dirs = (
+		'/home/storage' => 'general storage directory',
+		'/home/storage/db' => 'storage for SQLite database',
+	);
+
+	foreach my $dir (keys %dirs) {
+		&checking("", $dirs{$dir});
+		(-d $dir) || &mydie("unable to find directory $dir\n");
+		&ok;
+
+		&checking("accessiblity of", sprintf("%s (%s)", $dirs{$dir}, $dir));
+		my $x = `cd $dir > /dev/null 2>/dev/null ; echo \$?`;
+		$x += 0;
+		die("unable to cd to $dir") if ($x);
+		open(X, ">$dir/thundauralxxx.$$.tmp") || &mydie("unable to write to $dir");
+		close(X);
+		unlink("$dir/thundauralxxx.$$.tmp");
+		opendir(X, $dir) || &mydie("unable to open $dir for reading\n");
+		readdir(X) || &mydie("unable to get directory listing of $dir\n");
+		closedir(X);
+		&ok;
+	}
+
+	# bah! these shouldn't be hardcoded
+	my %programs = (
+		'/usr/bin/cdparanoia' => 'reading CDs',
+		'/bin/aumix-minimal' => 'changing the volume',
+		'/usr/bin/oggenc' => 'encoding audio',
+		'/sbin/fuser' => 'determining device usage',
+		'/bin/rm' => 'removing files', # duh
+		'/usr/bin/php' => 'downloading cover art',
+	);
+
+	foreach my $prog (keys %programs) {
+		&checking('program', $prog);
+		&haveprogram($prog) or &mydie("unable to locate $prog (used for ".$programs{$prog}.")\n");
+		&ok;
+	}
+
+	my @files = qw!
+		/usr/local/lib/php/AmazonSearch.php
+		/usr/local/lib/php/class.nusoap_base.php
+		/usr/local/lib/php/class.soapclient.php
+		/usr/local/lib/php/class.soap_fault.php
+		/usr/local/lib/php/class.soap_parser.php
+		/usr/local/lib/php/class.soap_server.php
+		/usr/local/lib/php/class.soap_transport_http.php
+		/usr/local/lib/php/class.soap_val.php
+		/usr/local/lib/php/class.wsdl.php
+		/usr/local/lib/php/class.xmlschema.php
+		/usr/local/lib/php/nusoap.php
+	!;
+	foreach my $f (@files) {
+		&checking('php lib file', $f);
+		if (!-s $f) {
+			mydie("please copy the contents of server/usr-local-lib-php to /usr/local/lib/php");
+			last;
+		}
+		&ok;
+	}
+
+	&runogg123check();
+}
+
+
+if ($check_client) {
+	print "\nChecking dependancies for client...\n";
+	&checking('perl module', 'SDL');
+	&havemodule('SDL') or &mydie("unable to locate module SDL.  Grab it from the Thundaural website download section.\n");
+	&ok;
+
+	&checking('SDL perl version');
+	use SDL;
+	die("SDL Perl version must be 2.0.2.  Grab it from the thundaural website download section.\n") if ($SDL::VERSION ne '2.0.2');
+	&ok($SDL::VERSION);
+
+	@modules = qw/SDL::Surface SDL::Constants 
+	SDL::App SDL::Event SDL::Color SDL::Timer SDL::Font 
+	SDL::TTFont SDL::Tool::Graphic SDL::Cursor IO::Socket IO::Socket::INET/;
+
+	foreach my $mod (@modules) {
+		&checking('perl module', $mod);
+		&havemodule($mod) or &mydie("unable to locate module $mod");
+		&ok;
+	}
+
+	my @programs = qw/ xscreensaver-command /;
+
+	foreach my $prog (@programs) {
+		&checking('program', $prog);
+		&haveprogram($prog) or &mydie("unable to locate $prog\n");
+		&ok;
+	}
+
+	my @fonts = qw! 
+		/usr/share/fonts/msfonts/georgia.ttf 
+		/usr/share/fonts/msfonts/arial.ttf 
+	!;
+
+	foreach my $font (@fonts) {
+		&checking("font", $font);
+		(-s $font) || &mydie("unable to find font $font\n");
+		&ok;
+	}
+}
+
+
+sub runogg123check {
+
+	my $SCRTMP = "/tmp/testogg123.$$.sh";
+	
+	&checking('ogg123');
+
+	open(X, ">$SCRTMP");
+	print X <<'EOF';
+#!/bin/bash
+
+TMPF=/tmp/testogg123.$$.out
+touch $TMPF
+if [ ! -f $TMPF ]; then
+        exit 8
+fi
+/usr/bin/ogg123 --remote - </dev/null >$TMPF 2>&1 &
+CHP=$!
+/bin/kill -9 $CHP
+RET=0
+grep -F 'unrecognized option' $TMPF >/dev/null 2>/dev/null
+if [ $? == 0 ]; then
+        # ogg123 doesn't support --remote
+        RET=1
+else
+        grep -F '@E Unknown command' $TMPF >/dev/null 2>/dev/null
+        if [ $? == 0 ]; then
+                # ogg123's remote patch isn't patched to fix stdin close
+                RET=2
+        fi
+fi
+if [ -f $TMPF ]; then
+        rm -f $TMPF
+fi
+echo "ret = $ret"
+exit $RET # it is patched!
+
+EOF
+
+	close(X);
+	system("/bin/bash $SCRTMP >/dev/null 2>/dev/null");
+	my $ret = $?;
+	$ret = $ret >> 8;
+	unlink($SCRTMP) if ( -f $SCRTMP);
+
+	my $url = 'http://thwartedefforts.org/jukebox/downloads.php';
+	my $msg;
+	if ($ret == 1) {
+		&mydie("ogg123 doesn't support --remote (see $url)");
+	} elsif ($ret == 2) {
+		&mydie("ogg123's --remote support isn't patched to handle stdin close (see $url)");
+	} elsif ($ret == 0) {
+		&ok("ogg123 is patched for --remote");
+	} else {
+		&mydie("an error occured while checking ogg123");
+	}
+}
+
+####
+
+sub haveprogram {
+	my $prog = shift;
+	system("which $prog >/dev/null 2>/dev/null");
+	my $r = $? >> 8;
+	return $r == 1 ? 0 : 1;
+}
+
+
+sub havemodule {
+	my $mod = shift;
+	eval "require($mod);";
+	return $@ =~ m/^Can't locate/ ? 0 : 1;
+}
+
+sub checking {
+	my $what = pop;
+	my $type = shift;
+	$type .= " " if ($type);
+	print "  checking for $type$what...";
+	$prfailed = 0;
+}
+
+sub ok {
+	return if ($prfailed);
+	if (@_) {
+		my $msg = shift;
+		print " $msg\n";
+	} else {
+		print " ok\n";
+	}
+}
+

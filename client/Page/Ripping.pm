@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-# $Header: /home/cvs/thundaural/client/Page/Ripping.pm,v 1.9 2004/01/04 04:57:19 jukebox Exp $
+# $Header: /home/cvs/thundaural/client/Page/Ripping.pm,v 1.14 2004/01/17 23:22:28 jukebox Exp $
 
 package Page::Ripping;
 
@@ -12,6 +12,7 @@ use Logger;
 use Data::Dumper;
 
 $Data::Dumper::Indent = 0;
+$Data::Dumper::Sortkeys = 1;
 
 use SDL;
 use SDL::Constants;
@@ -29,27 +30,27 @@ use Page;
 use Button;
 use ProgressBar;
 
+use POSIX qw(strftime);
+
 our @ISA = qw( Page );
 
-my $trackfontfile = "/usr/share/fonts/msfonts/georgia.ttf";
-my $trackfontsize = 35;
-my $tinfofontfile = "/usr/share/fonts/msfonts/georgia.ttf";
-my $tinfofontsize = 20;
-#my $nexttfontfile = "/usr/share/fonts/msfonts/georgia.ttf";
-my $nexttfontfile = "./fonts/MarkerFeltThin.ttf";
-my $nexttfontsize = 30;
+my $xbg = new SDL::Color(-r=>160,-g=>160,-b=>160);
+
+my $buttonfontfile = "/usr/share/fonts/msfonts/georgia.ttf";
+my $buttonfontsize = 20;
+my $buttonfont = new SDL::TTFont(-name=>$buttonfontfile, -size=>$buttonfontsize, -bg=>$xbg, -fg=>new SDL::Color(-r=>0,-g=>0,-b=>0));
+
+my $stattextfontfile = "/usr/share/fonts/msfonts/georgia.ttf";
+my $stattextfontsize = 30;
+my $stattextfont = new SDL::TTFont(-name=>$stattextfontfile, -size=>$stattextfontsize, -bg=>$xbg, -fg=>new SDL::Color(-r=>0,-g=>0,-b=>0));
+
 my $progressfontfile = "/usr/share/fonts/msfonts/arial.ttf";
 my $progressfontsize = 14;
-my $xbg = new SDL::Color(-r=>160,-g=>160,-b=>160);
-my $trackfont = new SDL::TTFont(-name=>$trackfontfile, -size=>$trackfontsize, -bg=>$xbg, -fg=>new SDL::Color(-r=>0,-g=>0,-b=>0));
-my $trackfontsmall = new SDL::TTFont(-name=>$trackfontfile, -size=>$trackfontsize*.75, -bg=>$xbg, -fg=>new SDL::Color(-r=>0,-g=>0,-b=>0));
-my $tinfofont = new SDL::TTFont(-name=>$tinfofontfile, -size=>$tinfofontsize, -bg=>$xbg, -fg=>new SDL::Color(-r=>0,-g=>0,-b=>0));
-my $nexttfont = new SDL::TTFont(-name=>$nexttfontfile, -size=>$nexttfontsize, -bg=>$xbg, -fg=>new SDL::Color(-r=>0,-g=>0,-b=>0));
-my $mostrecfont = new SDL::TTFont(-name=>$nexttfontfile, -size=>$nexttfontsize, -bg=>$xbg, -fg=>new SDL::Color(-r=>0,-g=>0,-b=>0));
 my $progressfont = new SDL::TTFont(-name=>$progressfontfile, -size=>$progressfontsize, -bg=>new SDL::Color(-r=>166, -g=>165, -b=>165), -fg=>new SDL::Color(-r=>32,-g=>32,-b=>32));
-my $volumefont = new SDL::TTFont(-name=>$progressfontfile, -size=>$progressfontsize, -bg=>$xbg, -fg=>new SDL::Color(-r=>32,-g=>32,-b=>32));
 
 my $redrawcount = 0;
+
+my $transparent = new SDL::Color(-r=>5, -g=>3, -b=>2);
 
 sub new {
 	my $proto = shift;
@@ -66,16 +67,27 @@ sub new {
 	$this->{-canvas} = $o{-canvas};
 	die("canvas is not an SDL::Surface") if (!ref($this->{-canvas}) && !$this->{-canvas}->isa('SDL::Surface'));
 
-	$this->{-albums} = $o{-albums}; # new Albums(-server=>$this->{-server});
-	die("passed argument for -albums not an Album object") if (!ref($this->{-albums}) && !$this->{-albums}->isa('Albums'));
-
 	$this->{-storagedir} = '/home/storage';
 
 	$this->{-topline} = $this->{-rect}->y();
 
 	$this->{-last} = {};
-	$this->{-s} = new SDL::Surface(-width=>$this->{-rect}->width(), -height=>$this->{-rect}->height());
+	$this->{-srect} = new SDL::Rect(-width=>1024-200-10-10, -height=>$this->{-rect}->height()-40, -x=>200+15, -y=>$this->{-rect}->y()+10+16+4);
+	$this->{-s} = new SDL::Surface(-width=>$this->{-srect}->width(), -height=>$this->{-srect}->height());
 	$this->{-s}->display_format();
+	{
+		my $x = $this->{-s};
+		$x->fill(0, $transparent);
+		$x->set_color_key(SDL::SDL_SRCCOLORKEY, $transparent);
+		# this code draws a red border on the outside pixels of the surface
+		#$x->fill(0, new SDL::Color(-r=>255, -g=>0, -b=>0));
+		#my $inside = new SDL::Rect(
+		#	-x=>1, -y=>1, -height=>$this->{-srect}->height()-2, -width=>$this->{-srect}->width()-2
+		#);
+		#$x->fill($inside, $transparent);
+	}
+
+	$this->{-lastlines} = ();
 
 	$this->{-coverartfile} = '';
 	$this->{-coverartsurface} = undef;
@@ -111,9 +123,9 @@ sub _make() {
 			my $x = new SDL::Surface(-width=>150, -height=>50);
 			$x->display_format();
 			$x->fill(0, new SDL::Color(-r=>140, -g=>140, -b=>140));
-			my $fw = $tinfofont->width($act);
-			my $fh = $tinfofont->height();
-			$tinfofont->print($x, ((150-$fw)/2), ((50-$fh)/2), $act);
+			my $fw = $buttonfont->width($act);
+			my $fh = $buttonfont->height();
+			$buttonfont->print($x, ((150-$fw)/2), ((50-$fh)/2), $act);
 			$actionbutton->surface($act, $x);
 		}
 		$actionbutton->frame($this->busy($reader) ? 'abort' : 'start');
@@ -125,14 +137,25 @@ sub _make() {
 						$this->{-server}->rip($reader);
 					}
 				} );
+
 		my $coverartbutton = new Button(
 				-name=>"00-coverart-$reader",
 				-canvas=>$this->{-canvas},
 				-mask=>new SDL::Rect(-width=>200, -height=>200, -x=>10, -y=>$topline+10)
 			);
 		$coverartbutton->predraw( sub { &main::draw_background($this->widget("00-coverart-$reader")->mask(), $this->{-canvas}); } );
-		$coverartbutton->on_interior_event(SDL::SDL_MOUSEBUTTONDOWN, sub { Logger::logger("hit coverart"); } );
 		$this->add_widget($coverartbutton);
+
+		my $progressbar = new ProgressBar(
+			-name=>"99-ripprogress-$reader",
+			-canvas=>$this->{-canvas},
+			-bg=>new SDL::Color(-r=>140, -g=>140, -b=>140),
+			-fg=>new SDL::Color(-r=>190, -g=>190, -b=>190),
+			-mask=>new SDL::Rect(-width=>$this->{-srect}->width()-20, -height=>16, -x=>$this->{-srect}->x()+10, -y=>$this->{-rect}->y()+10),
+			-labelfont=>$progressfont,
+			-labelcolor=>new SDL::Color(-r=>160, -g=>160, -b=>160)
+		);
+		$this->add_widget($progressbar);
 	}
 }
 
@@ -154,12 +177,10 @@ sub busy {
 
 	my $state = $this->{-server}->status_of($device)->{state};
 	return (defined($state) && $state ne 'idle');
-	#return ($this->{-server}->status_of($device)->{state} ne 'idle');
 }
 
 sub update {
 	my $this = shift;
-	my $transparent = new SDL::Color(-r=>5, -g=>3, -b=>2);
 	my $barcolor = new SDL::Color(-r=>0, -g=>0, -b=>0);
 	my $blit = 0;
 
@@ -167,28 +188,50 @@ sub update {
 
 	my $x = $this->{-s};
 	my $g = 10;
-	my $indent = 400;
+	my $indent = 200;
 	my @readers = @{$this->{-server}->devices('read')};
 	my $firstreader = shift @readers;
 	foreach my $reader ($firstreader) {
 		my $s = $this->{-server}->status_of($reader);
+		#my $s = {'current' => '0','devicename' => 'cdrom','genre' => 'rock','length' => '358','name' => 'Nothing Natural','percentage' => '40.24','performer' => 'Lush','popularity' => '0','rank' => '0','started' => '1073762898','state' => 'ripping','trackid' => '?','trackref' => '1/4','type' => 'read','volume' => 'with error correction'};
+
 		my $ss = Dumper($s);
-		if (!defined($this->{-last}->{$reader}) || $this->{-last}->{$reader} ne $ss) {
+		if (!exists($this->{-last}->{$reader}) || $this->{-last}->{$reader} ne $ss) {
 			$this->widget("00-ripaction-$reader")->frame($this->busy($reader) ? 'abort' : 'start');
-			$x->fill(0, $transparent);
-			$x->set_color_key(SDL::SDL_SRCCOLORKEY, $transparent);
-			my $vx = $s->{volume};
-			if (defined($vx) && length($vx) > 15) {
-				my $h = int(length($vx)/2);
-				($s->{volume1}, $s->{volume2}) = $vx =~ m/^(.{$h})(.*)$/;
-				delete $s->{volume};
+			my @lines;
+			if ($s->{state} eq 'idle') {
+				$this->widget("99-ripprogress-$reader")->hide(1);
+				@lines = ("Insert a disc and hit the start button to rip.");
+				push(@lines, " ", $s->{volume}, " ") if ($s->{volume});
+				@lines = $this->wrap($stattextfont, $this->{-srect}->width()-20, $this->{-srect}->height()-20, @lines);
+			} elsif ($s->{state} eq 'cleanup') {
+				@lines = $this->wrap($stattextfont, $this->{-srect}->width()-20, $this->{-srect}->height()-20, "cleaning up");
+			} else {
+				if ($s->{trackref} =~ m/\//) {
+					my ($ct, $tt) = $s->{trackref} =~ m/(\d+)\/(\d+)/;
+					push(@lines, sprintf('Ripping track %d of %d %s', $ct, $tt, $s->{volume}));
+					push(@lines, ' ');
+					push(@lines, sprintf('%s - %s', $s->{performer}, $s->{name}));
+					push(@lines, sprintf('%s of %s', $this->sectotime($s->{length}), $s->{genre}));
+					push(@lines, " ");
+                   			my $ststr = strftime '%H:%M:%S', localtime($s->{started});
+					#push(@lines, sprintf("started ripping at %s, %s ago", $ststr, $this->sectotime(time() - $s->{started})));
+					push(@lines, sprintf('started ripping at %s', $ststr));
+					push(@lines, sprintf('%d errors at current sector', $s->{current}));
+				} else {
+					push(@lines, sprintf('%s ', $s->{volume}));
+				}
+				@lines = $this->wrap($stattextfont, $this->{-srect}->width()-20, $this->{-srect}->height()-20, @lines);
+
+				if ($s->{percentage}) {
+					my $w = $this->widget("99-ripprogress-$reader");
+					$w->hide(0);
+					$w->pctfull($s->{percentage} / 100);
+					# the rank holds the current ripping speed
+					$w->label(sprintf('%d%% - speed %.2fx', $s->{percentage}, $s->{rank}));
+				}
 			}
-			foreach my $k (sort keys %$s) {
-				$nexttfont->print($x, $indent, $g, sprintf('%s ', defined($s->{$k}) ? $s->{$k} : ''));
-				my $width = $nexttfont->width(" $k: ");
-				$nexttfont->print($x, $indent-$width, $g, sprintf(' %s: ', $k));
-				$g += $nexttfont->height;
-			}
+			$g += $this->print_lines($x, $stattextfont, 10, $g, @lines);
 
 			$g += 60;
 			$this->{-last}->{$reader} = $ss;
@@ -198,13 +241,68 @@ sub update {
 	}
 
 	if ($blit) {
-		$x->blit(0, $this->{-canvas}, $this->{-rect});
+		$x->blit(0, $this->{-canvas}, $this->{-srect});
 		$this->draw();
 		if ($this->{-canvas}->isa('SDL::App')) {
 			$this->{-canvas}->sync();
 		}
 	}
 	0;
+}
+
+sub print_lines {
+	my $this = shift;
+	my $surface = shift;
+	my $font = shift;
+	my $x = shift;
+	my $y = shift;
+	my @lines = @_;
+
+	my $c = 0;
+	my $g = 0;
+	foreach my $l (@lines) {
+		if (!$this->{-lastlines}->[$c] || $l ne $this->{-lastlines}->[$c]) {
+			$l =~ s/\t/        /g;
+			$surface->fill(new SDL::Rect(-width=>$this->{-srect}->width()-20, -height=>$font->height(), -x=>10, -y=>$y+$g),
+				$transparent);
+			$font->print($surface, $x, $y+$g, $l);
+		}
+		$this->{-lastlines}->[$c] = $l;
+		$c++;
+		$g += $font->height();
+	}
+	return $g;
+}
+
+sub wrap {
+	my $this = shift;
+	my $font = shift;
+	my $pixelwidth = shift;
+	my $pixelheight = shift;
+	my @lines = @_;
+	my @ret = ();
+
+	my $maxlines = int($pixelheight / $font->height());
+
+	while(@lines) {
+		my $l1 = shift @lines;
+		my $l2 = '';
+		while ((my $x = $font->width($l1)) > $pixelwidth) {
+			my($lx, $lastword) = $l1 =~ m/^(.+) ([^ ]+)\s*$/;
+			$l1 = $lx if ($lx);
+			my $space = $l2 ? ' ' : '';
+			$l2 = "$lastword$space$l2" if ($lastword);
+		}
+		unshift(@lines, $l2) if ($l2);
+		push(@ret, $l1);
+		last if ((scalar @ret) >= $maxlines);
+	}
+	my $padded = 0;
+	while ((scalar @ret) < $maxlines) {
+		push(@ret, " ");
+		$padded++;
+	}
+	return @ret;
 }
 
 sub find_coverartfile {
@@ -215,7 +313,6 @@ sub find_coverartfile {
 		if (!$this->{-coverartsurface}) {
 			eval {
 				$this->{-coverartsurface} = new SDL::Surface(-name=>$this->{-coverartfile});
-				#$this->{-coverartsurface}->set_alpha(SDL::SDL_SRCALPHA, 128);
 				$this->{-coverartsurface}->display_format();
 				$this->widget("00-coverart-$reader")->surface(0, $this->{-coverartsurface});
 				$this->widget("00-coverart-$reader")->hide(0);
@@ -236,10 +333,9 @@ sub find_coverartfile {
 			$caf = "$sd/$caf";
 			if (-s $caf) {
 				$this->{-coverartfile} = $caf;
-				Logger::logger("using cover art file $caf");
+				#Logger::logger("using cover art file $caf");
 				eval {
 					$this->{-coverartsurface} = new SDL::Surface(-name=>$this->{-coverartfile});
-					#$this->{-coverartsurface}->set_alpha(SDL::SDL_SRCALPHA, 128);
 					$this->{-coverartsurface}->display_format();
 					$this->widget("00-coverart-$reader")->surface(0, $this->{-coverartsurface});
 					$this->widget("00-coverart-$reader")->hide(0);
@@ -277,7 +373,8 @@ sub sectotime {
 		push(@ret, "$hrs hours") if ($hrs);
 		push(@ret, "$min minutes") if ($min);
 		push(@ret, "$sec seconds") if ($sec);
-		return join(' and ', @ret);
+		my $last = pop @ret;
+		return join(', ', @ret)." and ".$last;
 	}
 }
 

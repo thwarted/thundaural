@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-# $Header: /home/cvs/thundaural/server/server.pl,v 1.6 2004/01/09 07:07:35 jukebox Exp $
+# $Header: /home/cvs/thundaural/server/server.pl,v 1.7 2004/01/17 23:18:24 jukebox Exp $
 
 use strict;
 use warnings;
@@ -44,12 +44,13 @@ while (@ARGV) {
 	}
 }
 
-my $listener = new IO::Socket::INET(Listen => 5, LocalPort => $port, Proto => 'tcp');
+my $listener = new IO::Socket::INET(Listen => 5, LocalPort => $port, Proto => 'tcp', ReuseAddr => 1);
 die if ($@);
 
 our $run : shared = 1;
 
 my $dbh = DBI->connect("dbi:SQLite:dbname=$dbfile","",""); # for this thread
+die if (!$dbh);
 # reset the playhistory, in case we were abort before
 {
 	my $q = "update playhistory set action = ? where action = ?";

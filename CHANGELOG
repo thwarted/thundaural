@@ -1,3 +1,36 @@
+changes from version 1.2 to version 1.3
+
+- bah, tell Data::Dumper to dump hashes sorted, so comparsions
+  work and we only update when we need to
+
+- Ripping page has been updated to be more user friendly
+  and use less CPU when updating
+
+- Ripping page shows the ripping speed as a function of the length
+  of the track, as reported by server/ripdisc.pl
+
+- Added Stats page
+
+- Removed a lot of debugging messages
+
+- Converted to use Sys::Syslog rather than /usr/bin/logger
+
+- added a simple script checkdeps which verifies that you have
+  everything you need installed
+
+- fixed track listing drawing overflow when different font is used
+  on the tracks page
+
+- if the server only reports one output, don't give the option
+  to select output on the tracks page
+
+- some minor layout changes to the tracks page
+
+- restricted font use to two fonts, both of which are in the msfonts
+  rpm on the website
+
+
+
 changes from version 1.1 to version 1.2
 
 - tested the whole thing with the provided empty database to
@@ -90,4 +123,4 @@ changes from version 1.0 to version 1.1
   libs I'm using, or SDL::TTFont code such that memory gets leaked everytime 
   lots of text is drawn to a surface.
 
-$Header: /home/cvs/thundaural/CHANGELOG,v 1.2 2004/01/09 07:08:23 jukebox Exp $
+$Header: /home/cvs/thundaural/CHANGELOG,v 1.3 2004/01/17 23:26:34 jukebox Exp $

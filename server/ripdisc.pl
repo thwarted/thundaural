@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-# $Header: /home/cvs/thundaural/server/ripdisc.pl,v 1.7 2004/01/04 09:51:58 jukebox Exp $
+# $Header: /home/cvs/thundaural/server/ripdisc.pl,v 1.11 2004/01/16 09:36:17 jukebox Exp $
 
 my $bin_getcoverart = './getcoverart.php';
 my $bin_cdparanoia = '/usr/bin/cdparanoia';
@@ -18,7 +18,6 @@ my $cddevice;
 my $maxtracks = 0;
 my $dryrun = 0;
 my $sqlitedb = '';
-my $sqldebugfile = "/tmp/ripsql.debug.$$";
               #0  1   2    3     4      5      6      7       8       9
 my @mcscale = (0, 50, 500, 1000, 10000, 25000, 75000, 100000, 200000, 500000);
 my $maxcorrections = $mcscale[9];
@@ -57,6 +56,11 @@ while (@ARGV) {
 }
 
 die ("missing --sqlitedb argument\n") if (!$sqlitedb);
+
+my $devname = $cddevice;
+$devname =~ s/\W/_/g;
+$devname =~ s/_+/_/g;
+my $sqldebugfile = sprintf('/tmp/ripsql.device%s.debug.%d', $devname, $$);
 
 if ($maxcorrections > $mcscale[9] || $maxcorrections < 0) {
 	$maxcorrections = $mcscale[9];
@@ -403,10 +407,10 @@ sub rip_track($$$$$$$) {
 				$corrections++;
 				$totalcorrections++ if ($optsk ne 'without error correction');
 				if (($corrections % $mod) == 0) {
-					&dumpstatus('ripping', $optsk, "$track/$maxtracks", $artist, $title, $genre, 0, 0, $tracklen, '?', $started, $corrections, $oldpct);
+					&dumpstatus('ripping', $optsk, "$track/$maxtracks", $artist, $title, $genre, 0, &calc_speed($tracklen, $started, $oldpct), $tracklen, '?', $started, $corrections, $oldpct);
 				}
 				if ($corrections >= $maxcorrections) {
-					&dumpstatus('ripping', $optsk, "$track/$maxtracks", $artist, $title, $genre, 0, 0, $tracklen, '?', $started, $corrections, $oldpct);
+					&dumpstatus('ripping', $optsk, "$track/$maxtracks", $artist, $title, $genre, 0, &calc_speed($tracklen, $started, $oldpct), $tracklen, '?', $started, $corrections, $oldpct);
 					kill 15, $cdpid;
 					close(PAR);
 					next ATTEMPT;
@@ -419,7 +423,7 @@ sub rip_track($$$$$$$) {
 				if ($pct ne $oldpct) {
 					$corrections = 0;
 					$oldpct = $pct;
-					&dumpstatus('ripping', $optsk, "$track/$maxtracks", $artist, $title, $genre, 0, 0, $tracklen, '?', $started, $corrections, $oldpct);
+					&dumpstatus('ripping', $optsk, "$track/$maxtracks", $artist, $title, $genre, 0, &calc_speed($tracklen, $started, $oldpct), $tracklen, '?', $started, $corrections, $oldpct);
 				}
 				next CDPOUTPUT;
 			}
@@ -486,7 +490,7 @@ sub insert_album(%) {
 	push(@$final_sqlcmds, $q);
 }
 
-sub mymktemp { return sprintf("%s/riptemp.pid%d.rand%d", $storagedir, $$, int(rand(99999))); }
+sub mymktemp { return sprintf('%s/riptemp.device%s.pid%d.rand%d', $storagedir, $devname, $$, int(rand(99999))); }
 sub trim { my($s) = shift; $s = '' if (!defined($s)); $s =~ s/\s+/ /g; $s =~ s/^\s+//; $s =~ s/\s+$//; $s =~ s/"//g; return $s; }
 
 sub get_track_lengths {
@@ -516,6 +520,19 @@ sub get_track_lengths {
 
 	close(T);
 	return ($res, $albumlength);
+}
+
+sub calc_speed($$) {
+	my($length, $started, $pct) = @_;
+	$pct /= 100;
+	my $now = time();
+	my $x1 = $now - $started;
+	my $xc = $length * $pct;
+	my $speed;
+	eval { $speed = $xc / $x1; };
+	$speed = 0 if ($@);
+	$speed = sprintf("%.2f", $speed);
+	return $speed;
 }
 
 sub dumpstatus($$$$$$$$$$$) {
@@ -559,7 +576,9 @@ sub log_current_rip($$) {
 
 sub cleanup {
 	&dumpstatus("cleanup", '', '', '', '', '', '', '');
-	`$bin_rm -f $storagedir/riptemp.*`;
+	my $pattern = sprintf('%s/riptemp.device%s.*', $storagedir, $devname);
+	`$bin_rm -f $pattern`;
+	sleep 3;
 }
 
 sub pid_using_device($) {
