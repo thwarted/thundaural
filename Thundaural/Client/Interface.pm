@@ -476,6 +476,22 @@ sub status_of {
     return $this->{status};
 }
 
+sub rip {
+    my $this = shift;
+    my $dev = shift;
+
+    my $result = $this->_do_cmd('rip', $dev);
+    return (200 <= $result && $result <= 299) ? 1 : 0;
+}
+
+sub abort_rip {
+    my $this = shift;
+    my $dev = shift;
+
+    my $result = $this->_do_cmd('abort', $dev);
+    return (200 <= $result && $result <= 299) ? 1 : 0;
+}
+
 sub playing_on {
     # returns a track object, or undef if no device/channel passed
     my $this = shift;
@@ -540,8 +556,9 @@ sub _populate_queued_on {
             if (!exists($this->{queuedon}->{$dn})) {
                 $this->{queuedon}->{$dn} = [];
             }
-            my $trk = new Thundaural::Client::Track(info=>$trkinfo);
-            push(@{$this->{queuedon}->{$dn}}, $trk);
+            if (my $trk = new Thundaural::Client::Track(info=>$trkinfo)) {
+                push(@{$this->{queuedon}->{$dn}}, $trk);
+            }
         }
         $this->{queuedonlastupdate} = time();
     } else {
