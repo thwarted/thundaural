@@ -35,7 +35,10 @@ sub widget_initialize {
 sub onClick {
     my $this = shift;
 
-    logger($this->name()." was hit");
+    my $dev = $main::client->devices('play');
+    my $skipon = shift @$dev;
+    logger('requesting skip on %s', $skipon);
+    $main::client->skip($skipon);
 }
 
 1;
