@@ -1,3 +1,10 @@
+changes from version 1.5 to version 1.5.1
+
+- disabled the edit command, which has not been updated for the
+  database schema changes.
+  I missed checking this change in for the 1.5 release.
+
+
 changes from version 1.4 to version 1.5
 
 - completely new ripdisc.pl script that supports modular album

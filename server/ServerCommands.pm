@@ -18,7 +18,7 @@ my $PROTOCOL_VERSION = '4';
 
 my $BIN_DF = '/bin/df';
 
-# $Header: /home/cvs/thundaural/server/ServerCommands.pm,v 1.17 2004/03/19 05:03:42 jukebox Exp $
+# $Header: /home/cvs/thundaural/server/ServerCommands.pm,v 1.18 2004/03/28 02:54:58 jukebox Exp $
 
 my @cmds = sort qw/pause skip tracks queued devices play albums quit help edit version
 		noop volume status who name rip abort stats randomize coverart checksum/;
@@ -1032,7 +1032,7 @@ sub cmd_version {
 	return (200, "200 version $PROTOCOL_VERSION\n");
 }
 
-sub cmd_edit {
+sub cmdx_edit {
 	my $this = shift;
 	my $input = shift;
 
