@@ -185,25 +185,8 @@ sub _read_status {
 			next if (${$this->{-track}} =~ m/^user aborted $rpid$/);
 			my @x = split(/\t/, $l);
             shift @x; # remove leading device name
-            my($state, $vol, $trkrf, undef, undef, undef, $pct, $corrections) = @x;
-			${$this->{-state}} = $state;
-            shift @x; # remove state;
+			${$this->{-state}} = shift @x;
 			${$this->{-track}} = join("\t", @x);
-			if (($c++ % 45) == 0) {
-                $pct ||= 0;
-                $corrections ||= 0;
-                $vol ||= '-';
-                $trkrf ||= '-';
-				#my $pct = (pop @x) || 0;
-				#my $corrections = (pop @x) || '0';
-				#my $vol = (shift @x) || '-';
-				#my $trkrf = (shift @x) || '-';
-                logger("pct = $pct");
-                logger("corrections = $corrections");
-				if ((int($pct) % 10) == 0 || int($corrections) != 0) {
-					logger("track $trkrf, $vol, $pct%, $corrections corrections");
-				}
-			}
 		}
 
 		last if ($l =~ m/^$devicefile\tidle/);
