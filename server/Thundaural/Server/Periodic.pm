@@ -172,7 +172,7 @@ sub enqueue_random_song {
 	# pick a random track that isn't in the last 20 tracks played
 	my $q = "select trackid from tracks where trackid not in 
 		(select distinct trackid from playhistory where devicename = ? order by playhistoryid desc limit 20)
-		order by random() limit 1";
+		and length > 2 order by random() limit 1";
 	my $sth = $this->{-dbh}->prepare($q);
 	$sth->execute($devicename);
 	my($trackid) = $sth->fetchrow_array();
