@@ -19,18 +19,19 @@ fi
 PATH=$PATH:/usr/local/bin
 export PATH
 
-JUKEDIR=/usr/local/thundaural/server
+JUKEDIR=/usr/local/thundaural
 JUKEUSER=jukesv
 
+SU=/bin/su
 
-JUKESERVER=$JUKEDIR/server.pl
+JUKESERVER=$JUKEDIR/taserver
 JUKESERVERCMD="/usr/bin/perl $JUKESERVER"
-JUKESHUTDOWN=$JUKEDIR/shutdown-server.pl
+JUKESHUTDOWN=$JUKEDIR/tashutdownserver
 JUKESHUTDOWNCMD="/usr/bin/perl $JUKESHUTDOWN"
 
-LOCKFILE=${INITLOCK:-/mnt/lockdev}/thundauralserver
+LOCKFILE=${INITLOCK:-/var/lock/subsys}/thundauralserver
 
-if [ ! -s $JUKESERVER ]; then
+if [ ! -s $JUKESERVER -o ! -x $JUKESERVER ]; then
   echo "Could not find jukebox server script"
   failure "Could not find jukbox server script"
   echo
@@ -46,7 +47,7 @@ fi
 case "$1" in
   start)
 	echo -n "Starting thundaural jukebox server:"
-	( cd $JUKEDIR ; exec /usr/bin/su $JUKEUSER -c "exec $JUKESERVERCMD" )
+	( cd $JUKEDIR ; exec $SU $JUKEUSER -c "exec $JUKESERVERCMD" )
 	RETVAL=$?
 	[ $RETVAL -eq 0 ] && touch $LOCKFILE
 	echo_success
@@ -54,7 +55,7 @@ case "$1" in
 	;;
   stop)
 	echo -n "Shutting down thundaural jukebox server:"
-	( cd $JUKEDIR ; exec /usr/bin/su $JUKEUSER -c "exec $JUKESHUTDOWNCMD" ) > /dev/null 2>&1
+	( cd $JUKEDIR ; exec $SU $JUKEUSER -c "exec $JUKESHUTDOWNCMD" ) > /dev/null 2>&1
 	RETVAL=$?
 	if [ $RETVAL -eq 0 ]; then
 		rm -f $LOCKFILE
