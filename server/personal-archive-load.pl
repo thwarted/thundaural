@@ -292,7 +292,7 @@ sub validate_options {
     if ($useaomdefaults) {
         @metadata_location = qw(tags filename);
         @matchorder = qw(tracknum);
-        $pattern = '^(\d+)_.+$';
+        $pattern = '^(\d+)\D.+$';
     }
     if (! scalar @matchorder) {
         @matchorder = qw(artist album tracknum title);
