@@ -131,7 +131,7 @@ sub hide_nav_buttons {
     my $total = $main::client->albums_count();
     my $max = $total - $this->{albums_per_page};
 
-    if ($offset == 0 && $total < scalar @{$this->{albumbuttons}}) {
+    if ($offset == 0 && $total <= scalar @{$this->{albumbuttons}}) {
         $this->get_widget('albumprev')->visible(0);
         $this->get_widget('albumnext')->visible(0);
         $this->get_widget('albumslider')->visible(0);
