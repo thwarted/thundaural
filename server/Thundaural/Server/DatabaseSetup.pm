@@ -21,6 +21,7 @@ my $dbfile;
 my $storagedir;
 
 my $keepdbbackups = 5;
+my $performerslist = {}; 
 
 sub init {
 	my %o = @_;
@@ -35,12 +36,13 @@ sub init {
 		die("$d isn't fully accessible, check permissions");
 	}
 
+	&backup_database($dbfile);
+
 	$dbh = DBI->connect("dbi:SQLite:dbname=$dbfile","","", { RaiseError => 1, PrintError=>0 } );
 	die("unable to open/create database $dbfile, check permissions\n") if (!$dbh);
 
 	logger("using SQLite version %s", $dbh->{sqlite_version});
 
-	&backup_database($dbfile);
 	&create_all_v1_tables() if (&get_db_version() < 1);
 	&upgrade_to_version2() if (&get_db_version() < 2);
 	&upgrade_to_version3() if (&get_db_version() < 3);
@@ -98,27 +100,29 @@ sub backup_database {
 }
 
 sub get_db_version {
-	my($res, $q, $sth, $vv);
+	my($res, $q, $vv);
 
 	my $foundtables = 0;
 	foreach my $table (qw/ albums genres playhistory tracks/) {
 		$q = "select * from $table limit 1";
-		$sth = $dbh->prepare($q);
-		eval { $sth->execute(); };
+		eval { 
+		    my $sth = $dbh->prepare($q);
+            $sth->execute(); 
+		    $sth->finish();
+        };
 		$res = $@;
-		$sth->finish();
 		$foundtables++ if (!$res);
 	}
 	return 0 if ($foundtables < 4); # create new database
 
 	$q = "select value from meta where name = ? limit 1";
-	$sth = $dbh->prepare($q);
 	eval { 
+	    my $sth = $dbh->prepare($q);
 		$sth->execute('dbversion'); 
 		($vv) = $sth->fetchrow_array();
+	    $sth->finish();
 	};
 	$res = $@;
-	$sth->finish();
 	return 1 if ($@ =~ m/no such table: meta/); # version 1 database
 	return $vv;
 }
@@ -394,6 +398,10 @@ EOF
 sub upgrade_to_version3 {
 	logger("upgrading database to version 3");
 
+    # can't create a function while inside a transaction with SQLite3 (DBD::SQLite 1.x)
+    # so create it here.  Note that it references a global variable
+	$dbh->func('perfid', 1, sub { my $name = shift; return $performerslist->{$name}; }, 'create_function' );
+
 	$dbh->begin_work();
 	&v3_albumimages();
 	&v3_performers();
@@ -518,11 +526,10 @@ sub v3_albums {
 	$q = "select performerid, name from performers";
 	my $sth = $dbh->prepare($q);
 	$sth->execute();
-	my $performerslist = {};
 	while(my($id, $n) = $sth->fetchrow_array()) {
 		$performerslist->{$n} = $id;
 	}
-	$dbh->func('perfid', 1, sub { my $name = shift; return $performerslist->{$name}; }, 'create_function' );
+    $sth->finish();
 
 	# create new albums table
 	$q = "create table albums (\n".
