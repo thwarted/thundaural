@@ -26,10 +26,15 @@ sub sectotime {
         return join(":", @ret);
     } else {
         my @ret = ();
-        push(@ret, "$hrs hours") if ($hrs);
-        push(@ret, "$min minutes") if ($min);
-        push(@ret, "$sec seconds") if ($sec);
-        return join(' and ', @ret);
+        push(@ret, sprintf('%d hour%s', $hrs, $hrs == 1 ? '':'s')) if ($hrs);
+        push(@ret, sprintf('%d minute%s', $min, $min == 1 ? '':'s')) if ($min);
+        push(@ret, sprintf('%d second%s', $sec, $sec == 1 ? '':'s')) if ($sec);
+        if ((scalar @ret) > 1) {
+            my $xl = pop @ret;
+            my $xs = pop @ret;
+            push(@ret, "$xs and $xl");
+        }
+        return join(', ', @ret);
     }
 }
 
