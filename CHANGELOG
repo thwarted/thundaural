@@ -1,3 +1,14 @@
+changes from version 2.0 to 2.1
+
+- added tamaint script.  This script can be used to do minor database 
+  maintenance and the functionality of the taalbumimages and taverify script 
+  will most likely be rolled into this script in the future.  Currently, it 
+  only allows you to completely delete an album from the database
+
+- the default poll time for wav files to convert to ogg was increased 
+  significantly
+
+
 changes from version 1.7 to 2.0
 
 - new directory structure, moving all the programs out of client/ and server/

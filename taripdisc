@@ -60,7 +60,7 @@ if ($sx->{cddevice} && !$sx->{infofile}) {
     my $cdinfo = &get_audiocd_info;
 
     if (!defined($cdinfo)) {
-        &dumpstatus("idle", "unable to get album information from disc");
+        &dumpstatus("idle", "unable to lookup album information");
         exit;
     }
     &dump_discinfo($cdinfo, '1lookup');
@@ -919,7 +919,7 @@ sub passthru {
 }
 
 #    Thundaural Jukebox
-#    Copyright (C) 2003-2004  Andrew A. Bakun
+#    Copyright (C) 2003-2005  Andrew A. Bakun
 #
 #    This program is free software; you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by

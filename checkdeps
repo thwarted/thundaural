@@ -1,7 +1,5 @@
 #!/usr/bin/perl
 
-# $Header: /home/cvs/thundaural/checkdeps,v 1.14 2004/06/10 05:57:38 jukebox Exp $
-
 # just a little quick and dirty script to help you make sure you have all the 
 # dependancies installed.  It should really be better than this.  lots of code 
 # duplication here
@@ -372,7 +370,7 @@ EOF
 }
 
 #    Thundaural Jukebox
-#    Copyright (C) 2003-2004  Andrew A. Bakun
+#    Copyright (C) 2003-2005  Andrew A. Bakun
 #
 #    This program is free software; you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by

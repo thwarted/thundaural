@@ -131,7 +131,7 @@ sub spawn_reader {
 1;
 
 #    Thundaural Jukebox
-#    Copyright (C) 2003-2004  Andrew A. Bakun
+#    Copyright (C) 2003-2005  Andrew A. Bakun
 #
 #    This program is free software; you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by

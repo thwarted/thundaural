@@ -49,6 +49,6 @@ device main:play=/dev/dsp:mixer=/dev/mixer
 device cdrom:read=/dev/cdrom
 
 # relative to homedir if it doesn't begin with a /
-cmd ripcdrom:ripdisc.pl --dbfile ${DBFILE} --device ${DEVICEFILE} --storagedir ${STORAGEDIR} ${PROGOPTS}
+cmd ripcdrom:taripdisc --dbfile ${DBFILE} --device ${DEVICEFILE} --storagedir ${STORAGEDIR} ${PROGOPTS}
 cmd volumeset:/usr/bin/aumix -d ${DEVICEFILE} -w100 -v${VOLUME}
 cmd volumequery:/usr/bin/aumix -d ${DEVICEFILE} -q

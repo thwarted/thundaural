@@ -30,7 +30,7 @@ For each album, the process is three steps:
      simply a matter of giving this script the directory that contains the
      tracks.  It will generate a .pv file.
 
-  3. feed the .pv file to the server/ripdisc.pl script, which will populate
+  3. feed the .pv file to the taripdisc script, which will populate
      the database and copy the audio files and cover art to the correct place
      so the Thundaural jukebox server can access them.
 
@@ -152,19 +152,19 @@ Note that if you run tapersonalarchive multiple times and it finds
 different metadata, you might end up with multiple files because the filename
 contains the artist and album name it found.
 
-You can now feed the .pv file to the ripdisc.pl script, to get the files 
+You can now feed the .pv file to the taripdisc script, to get the files 
 copied to the correct place and the database to be loaded.  Usually this 
 script is invoked by the server to rip a physical CD, but in this case we'll
 invoke it ourselves on the command line:
 
-./ripdisc.pl --infofile X.pv --storagedir SD --dbfile DBF
+./taripdisc --infofile X.pv --storagedir SD --dbfile DBF
 
 where:
   X.pv is the file written by the tapersonalarchive script
   SD   is the storage directory (usually /home/storage)
   DBF  is the path to the database file (usually /home/storage/db/data.db)
 
-The ripdisc.pl script currently does not read the thundural-server.conf file
+The taripdisc script currently does not read the thundural-server.conf file
 for these values (that'll be in an upcoming version) so you'll need to specify
 them yourself.
 

@@ -47,7 +47,7 @@ Later versions can some serious database changes, but the server is designed
 to upgrade the database schema to the latest version automaticly, without
 losing any data.
 
-The server/ripdisc.pl script uses cdda2wav and oggenc, you'll need to
+The taripdisc script uses cdda2wav and oggenc, you'll need to
 have those installed, along with XML::Ximple (for the MusicBrainz
 module) CDDB_get (for the FreeDB module). Both are available on CPAN).
 I recommend you also install dagrab, which seems to work better than
