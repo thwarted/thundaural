@@ -34,13 +34,13 @@ sub widget_initialize {
     $this->set_frame(file=>'images/nowplaying-speaker5.png', resize=>1, frame=>5);
     $this->set_frame(file=>'images/nowplaying-speaker6.png', resize=>1, frame=>6);
 
-    $this->set_depressed_frame(file=>'images/nowplaying-speakerdepressed0.png', resize=>1, frame=>0);
-    $this->set_depressed_frame(file=>'images/nowplaying-speakerdepressed1.png', resize=>1, frame=>1);
-    $this->set_depressed_frame(file=>'images/nowplaying-speakerdepressed2.png', resize=>1, frame=>2);
-    $this->set_depressed_frame(file=>'images/nowplaying-speakerdepressed3.png', resize=>1, frame=>3);
-    $this->set_depressed_frame(file=>'images/nowplaying-speakerdepressed4.png', resize=>1, frame=>4);
-    $this->set_depressed_frame(file=>'images/nowplaying-speakerdepressed5.png', resize=>1, frame=>5);
-    $this->set_depressed_frame(file=>'images/nowplaying-speakerdepressed6.png', resize=>1, frame=>6);
+    $this->set_depressed_frame(file=>'images/nowplaying-speaker0.png', resize=>1, frame=>0);
+    $this->set_depressed_frame(file=>'images/nowplaying-speaker1.png', resize=>1, frame=>1);
+    $this->set_depressed_frame(file=>'images/nowplaying-speaker2.png', resize=>1, frame=>2);
+    $this->set_depressed_frame(file=>'images/nowplaying-speaker3.png', resize=>1, frame=>3);
+    $this->set_depressed_frame(file=>'images/nowplaying-speaker4.png', resize=>1, frame=>4);
+    $this->set_depressed_frame(file=>'images/nowplaying-speaker5.png', resize=>1, frame=>5);
+    $this->set_depressed_frame(file=>'images/nowplaying-speaker6.png', resize=>1, frame=>6);
 
     #$this->animate(550);
 
