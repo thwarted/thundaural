@@ -5,6 +5,7 @@ use warnings;
 
 use lib '.';
 
+use Carp qw(cluck);
 use Data::Dumper;
 use Storable qw(freeze thaw);
 
@@ -30,6 +31,8 @@ our $starttime = time();
 mkdir $tmpdir, 0700;
 
 END { my $x = $?; if ($tmpdir && -d $tmpdir) { `/bin/rm -rf $tmpdir`; } $? = $x; }
+
+$SIG{__WARN__} = sub { cluck($@); };
 
 Thundaural::Logger::init('stderr');
 our $client = new Thundaural::Client::Interface(host=>'jukebox', port=>9000);
@@ -92,10 +95,10 @@ sub mainloop {
             }
         }
         if ($updates) {
-            logger("blitted $updates surfaces");
+            #logger("blitted $updates surfaces");
             $app->sync();
             my $tickdiff = $app->ticks() - $ticks;
-            logger("ticks to do draw cycle: $tickdiff");
+            #logger("ticks to do draw cycle: $tickdiff");
         }
         if ($e->poll()) {
             my $type = $e->type();
@@ -104,6 +107,9 @@ sub mainloop {
                     my $key = $e->key_name();
                     last if ($key eq 'q');
                     $app->fullscreen if ($key eq 'f');
+                    if ($key eq 'r') {
+                        $client->clear_cache();
+                    }
                 }
                 my $ticks = $app->ticks();
                 #logger("event @ $ticks");
