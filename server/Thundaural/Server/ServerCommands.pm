@@ -792,7 +792,7 @@ sub cmd_tracks {
                     "%.7f\t%d\t%d\n",
                     $albumid, $a->{albumorder}, 
                     $a->{performer}, $a->{name}, $a->{length}, $a->{trackid}, 
-                    ($a->{popularity} || 0), ($a->{rank} || 0), ($a->{riperrors} || 0));
+                    ($a->{popularity} || 0), ($a->{rank} || 0));
             push(@r, $x);
         }
         $sth->finish;
