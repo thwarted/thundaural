@@ -46,6 +46,10 @@ sub stop {
     return 1;
 }
 
+sub heartbeat {
+    return 0;
+}
+
 sub add_widget {
     my $this = shift;
 

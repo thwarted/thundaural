@@ -50,13 +50,15 @@ sub theme_initialize {
     $this->add_widget(new Themes::Original::StatsPage(name=>'StatsPage'));
     $this->add_widget(new Themes::Original::RipperPage(name=>'RipperPage'));
 
+    $this->{lastalbumcount} = 0;
 }
 
 sub start {
     my $this = shift;
 
     $this->SUPER::start();
-    $this->show_page('NowPlayingPage');
+    #$this->show_page('NowPlayingPage');
+    $this->show_page('AlbumsPage');
 }
 
 sub show_page {
@@ -80,6 +82,33 @@ sub show_page {
     } else {
         logger("unable to find page widget $showpage");
     }
+}
+
+sub heartbeat {
+    my $this = shift;
+
+    if ((my $x = $main::client->albums_count()) != $this->{lastalbumcount}) {
+        if (my $w = $this->get_widget('AlbumsPage')) {
+            $w->update_albumbuttons();
+        }
+        $this->{lastalbumcount} = $x;
+    }
+
+    my $s = $main::client->status_of();
+    my $playing = 0;
+    my $ripping = 0;
+    foreach my $dev (keys %$s) {
+        if ($s->{$dev}->{state} ne 'idle') {
+            if ($s->{$dev}->{type} eq 'play') {
+                $playing++;
+            } elsif ($s->{$dev}->{type} eq 'read') {
+                $ripping++;
+            }
+        }
+    }
+    my $w = $this->get_widget('IconNowPlaying')->animate($playing * 600);
+    my $w = $this->get_widget('IconRipper')->animate($ripping * 600);
+    return 3000;
 }
 
 

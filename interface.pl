@@ -5,7 +5,7 @@ use warnings;
 
 use lib '.';
 
-use Carp qw(cluck);
+use Carp qw(cluck confess);
 use Data::Dumper;
 use Storable qw(freeze thaw);
 
@@ -25,17 +25,20 @@ use Thundaural::Logger qw(logger);
 use Thundaural::Client::Interface;
 
 use Themes::Original;
+our $theme;
 
-our $tmpdir = "/tmp/newclient-cache-$$";
+mkdir '/tmp/newclient', 0777;
+our $tmpdir = "/tmp/newclient/cache-$$";
 our $starttime = time();
 mkdir $tmpdir, 0700;
 
 END { my $x = $?; if ($tmpdir && -d $tmpdir) { `/bin/rm -rf $tmpdir`; } $? = $x; }
 
-$SIG{__WARN__} = sub { cluck($@); };
+$SIG{__WARN__} = sub { cluck(@_) };
+$SIG{__DIE__} = sub { confess(@_) };
 
 Thundaural::Logger::init('stderr');
-our $client = new Thundaural::Client::Interface(host=>'jukebox', port=>9000);
+our $client = new Thundaural::Client::Interface(host=>'localhost', port=>9000);
 
 my $al = $client->albums(offset=>0, count=>3);
 foreach my $a (@$al) {
@@ -47,8 +50,6 @@ foreach my $a (@$al) {
 }
 
 &mainloop;
-
-our $theme;
 
 sub mainloop {
 
@@ -74,6 +75,7 @@ sub mainloop {
     #$app->fill(0, new SDL::Color(-r=>160, -g=>160, -b=>160));
     $app->sync();
     my $e = new SDL::Event;
+    my $nextheartbeat = 0;
     while(1) {
         my $updates = 0;
         my $ticks = $app->ticks();
@@ -115,6 +117,9 @@ sub mainloop {
                 #logger("event @ $ticks");
                 $theme->receive_event(ticks=>$ticks, event=>$e);
             }
+        }
+        if ($ticks > $nextheartbeat) {
+            $nextheartbeat = $ticks += $theme->heartbeat();
         }
         if (!$updates) {
             $app->delay(10);
