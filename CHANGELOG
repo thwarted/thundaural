@@ -1,3 +1,43 @@
+changes from version 1.3 to version 1.4
+
+- renamed Statistics.pm to Periodic.pm, since it will now handle
+  things we want to do periodicly
+
+- removed bogus dependency on DBI in the client
+
+- checkdeps script now checks for other SDL libraries needed for
+  SDL_perl
+
+- server supports random play using the randomize command
+
+- beginnings for the client interface for randomized play
+  (showing the current status is kind of buggy)
+
+- minor visual changes to the popularity display in the track listing
+
+- server returns response code 202 when a block of binary data is
+  being sent
+
+- 'coverart <albumid>' command added to server, which dumps the
+  cover art file to the client.
+
+- client doesn't know about local storage of cover art files anymore
+  it uses the new coverart command to download them from the server
+  and locally caches them in /tmp
+
+- server now builds the database if it doesn't exist, no need to
+  manually create it using the SQLite command line client (which
+  might not exist if you installed DBI::SQLite)
+
+- server can now automaticly upgrade the database if the database
+  format changes
+
+- removed dependency on the Microsoft Webfonts Arial and Georgia.
+  the freely available Bitstream Vera fonts look better
+  (and can be freely redistributed)
+
+
+
 changes from version 1.2 to version 1.3
 
 - bah, tell Data::Dumper to dump hashes sorted, so comparsions
@@ -123,4 +163,4 @@ changes from version 1.0 to version 1.1
   libs I'm using, or SDL::TTFont code such that memory gets leaked everytime 
   lots of text is drawn to a surface.
 
-$Header: /home/cvs/thundaural/CHANGELOG,v 1.3 2004/01/17 23:26:34 jukebox Exp $
+$Header: /home/cvs/thundaural/CHANGELOG,v 1.6 2004/01/31 08:55:27 jukebox Exp $

@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-# $Header: /home/cvs/thundaural/client/Page/Ripping.pm,v 1.14 2004/01/17 23:22:28 jukebox Exp $
+# $Header: /home/cvs/thundaural/client/Page/Ripping.pm,v 1.16 2004/01/30 05:34:12 jukebox Exp $
 
 package Page::Ripping;
 
@@ -36,15 +36,15 @@ our @ISA = qw( Page );
 
 my $xbg = new SDL::Color(-r=>160,-g=>160,-b=>160);
 
-my $buttonfontfile = "/usr/share/fonts/msfonts/georgia.ttf";
+my $buttonfontfile = "./fonts/Vera.ttf";
 my $buttonfontsize = 20;
 my $buttonfont = new SDL::TTFont(-name=>$buttonfontfile, -size=>$buttonfontsize, -bg=>$xbg, -fg=>new SDL::Color(-r=>0,-g=>0,-b=>0));
 
-my $stattextfontfile = "/usr/share/fonts/msfonts/georgia.ttf";
+my $stattextfontfile = "./fonts/Vera.ttf";
 my $stattextfontsize = 30;
 my $stattextfont = new SDL::TTFont(-name=>$stattextfontfile, -size=>$stattextfontsize, -bg=>$xbg, -fg=>new SDL::Color(-r=>0,-g=>0,-b=>0));
 
-my $progressfontfile = "/usr/share/fonts/msfonts/arial.ttf";
+my $progressfontfile = "./fonts/Vera.ttf";
 my $progressfontsize = 14;
 my $progressfont = new SDL::TTFont(-name=>$progressfontfile, -size=>$progressfontsize, -bg=>new SDL::Color(-r=>166, -g=>165, -b=>165), -fg=>new SDL::Color(-r=>32,-g=>32,-b=>32));
 
@@ -184,8 +184,6 @@ sub update {
 	my $barcolor = new SDL::Color(-r=>0, -g=>0, -b=>0);
 	my $blit = 0;
 
-	&main::draw_background($this->{-rect}, $this->{-canvas});
-
 	my $x = $this->{-s};
 	my $g = 10;
 	my $indent = 200;
@@ -241,6 +239,7 @@ sub update {
 	}
 
 	if ($blit) {
+		&main::draw_background($this->{-rect}, $this->{-canvas});
 		$x->blit(0, $this->{-canvas}, $this->{-srect});
 		$this->draw();
 		if ($this->{-canvas}->isa('SDL::App')) {

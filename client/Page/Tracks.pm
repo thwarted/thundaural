@@ -29,21 +29,21 @@ our @ISA = qw( Page );
 
 my $transparent = new SDL::Color(-r=>1,-g=>128,-b=>254);
 
-my $titlefontfile = "/usr/share/fonts/msfonts/georgia.ttf";
+my $titlefontfile = "./fonts/Vera.ttf";
 my $titlefontsize = 21;
 my $aifont = new SDL::TTFont(-name=>$titlefontfile, -size=>17, -bg=>new SDL::Color(-r=>196,-g=>160,-b=>160), -fg=>new SDL::Color(-r=>0,-g=>0,-b=>0));
 my $titlefont = new SDL::TTFont(-name=>$titlefontfile, -size=>$titlefontsize, -bg=>new SDL::Color(-r=>160,-g=>160,-b=>160), -fg=>new SDL::Color(-r=>0,-g=>0,-b=>0));
 
-my $trackfontfile = "/usr/share/fonts/msfonts/arial.ttf";
+my $trackfontfile = "./fonts/Vera.ttf";
 my $trackfontsize = 35;
 my $trackfont = new SDL::TTFont(-name=>$trackfontfile, -size=>$trackfontsize, -bg=>new SDL::Color(-r=>160,-g=>160,-b=>160), -fg=>new SDL::Color(-r=>0,-g=>0,-b=>0));
 my $trackfontsmall = new SDL::TTFont(-name=>$trackfontfile, -size=>$trackfontsize*.75, -bg=>new SDL::Color(-r=>160,-g=>160,-b=>160), -fg=>new SDL::Color(-r=>0,-g=>0,-b=>0));
 
-my $tinfofontfile = "/usr/share/fonts/msfonts/georgia.ttf";
+my $tinfofontfile = "./fonts/Vera.ttf";
 my $tinfofontsize = 20;
 my $tinfofont = new SDL::TTFont(-name=>$tinfofontfile, -size=>$tinfofontsize, -bg=>new SDL::Color(-r=>160,-g=>160,-b=>160), -fg=>new SDL::Color(-r=>0,-g=>0,-b=>0));
 
-my $nexttfontfile = "/usr/share/fonts/msfonts/georgia.ttf";
+my $nexttfontfile = "./fonts/Vera.ttf";
 my $nexttfontsize = 14;
 my $nexttfont = new SDL::TTFont(-name=>$nexttfontfile, -size=>$nexttfontsize, -bg=>new SDL::Color(-r=>160,-g=>160,-b=>160), -fg=>new SDL::Color(-r=>0,-g=>0,-b=>0));
 
@@ -310,7 +310,7 @@ sub now_viewing {
 			$rt = $this->english_rank($rt);
 			push(@data, "ranked $rt") if ($rt);
 			my $pop = $t->popularity();
-			push(@data, ($pop+0) ? sprintf('popularity %.4f', $pop) : 'never played');
+			push(@data, ($pop+0) ? sprintf('popularity %.4f', $pop*1000) : 'never played');
 			my $d = join(', ', @data);
 			$tinfofont->print($trlcon, 50, ($line*$basesize)+$trackfont->height, $d);
 		};
@@ -341,7 +341,6 @@ sub _make_album_cover($) {
 	my $failed = 1;
 	my $file = $this->{-albums}->coverartfile($alid);
 	if ($file) {
-		$file = sprintf('%s/%s', $this->{-storagedir}, $file);
 		if (-s $file) {
 			eval {
 				$x = new SDL::Surface(-name=>$file);

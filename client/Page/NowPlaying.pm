@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-# $Header: /home/cvs/thundaural/client/Page/NowPlaying.pm,v 1.8 2004/01/16 09:33:29 jukebox Exp $
+# $Header: /home/cvs/thundaural/client/Page/NowPlaying.pm,v 1.9 2004/01/30 05:34:12 jukebox Exp $
 
 package Page::NowPlaying;
 
@@ -33,8 +33,7 @@ use ProgressBar;
 our @ISA = qw( Page );
 
 my $xbg = new SDL::Color(-r=>160,-g=>160,-b=>160);
-my $progressfontfile = "/usr/share/fonts/msfonts/arial.ttf";
-#my $progressfontfile = "/usr/share/fonts/msfonts/georgia.ttf";
+my $progressfontfile = "./fonts/Vera.ttf";
 my $progressfontsize = 14;
 my $progressfont = new SDL::TTFont(-name=>$progressfontfile, -size=>$progressfontsize, -bg=>new SDL::Color(-r=>166, -g=>165, -b=>165), -fg=>new SDL::Color(-r=>32,-g=>32,-b=>32));
 my $volumefontsize = 30;

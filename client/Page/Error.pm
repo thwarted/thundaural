@@ -29,7 +29,7 @@ use Button;
 
 our @ISA = qw( Page );
 
-my $errormsgfont = '/usr/share/fonts/msfonts/georgia.ttf';
+my $errormsgfont = './fonts/Vera.ttf';
 my $errormsgfontsize = 20;
 
 sub new {

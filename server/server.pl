@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-# $Header: /home/cvs/thundaural/server/server.pl,v 1.7 2004/01/17 23:18:24 jukebox Exp $
+# $Header: /home/cvs/thundaural/server/server.pl,v 1.11 2004/01/30 09:43:25 jukebox Exp $
 
 use strict;
 use warnings;
@@ -26,7 +26,9 @@ use ServerCommands;
 use Logger;
 use Player;
 use Reader;
-use Statistics;
+use Periodic;
+
+use DatabaseSetup;
 
 use DBI;
 
@@ -43,6 +45,8 @@ while (@ARGV) {
 		next;
 	}
 }
+
+DatabaseSetup::init($dbfile);
 
 my $listener = new IO::Socket::INET(Listen => 5, LocalPort => $port, Proto => 'tcp', ReuseAddr => 1);
 die if ($@);
@@ -67,8 +71,16 @@ $dbh->disconnect();
 my $storagedir = Settings::storagedir();
 my $dblock : shared = 0xfef1f0fa;
 
-my $stats = new Statistics(-dbfile=>$dbfile, -ref_dblock=>\$dblock);
-my $statsthr = threads->new(sub { eval { $stats->run(); }; Logger::logger("statistics thread no longer running"); } );
+my $periodic;
+my $periodicthr;
+{
+	my $pstate : shared = '';
+	$periodic = new Periodic(-dbfile=>$dbfile, 
+				-ref_dblock=>\$dblock,
+				-ref_state=>\$pstate,
+			);
+	$periodicthr = threads->new(sub { eval { $periodic->run(); }; Logger::logger("periodic tasks thread no longer running: $@"); } );
+}
 
 my $playerthrs = {};
 {
@@ -107,7 +119,7 @@ sub spawn_player_thread {
 			);
 	# we set this to one here to avoid a race condition, whereby the thread hasn't started yet, and we still read -running as 0
 	my $running : shared = 1;
-	my $playerthr = threads->new(sub { $running = 1; eval { $player->run(); }; Logger::logger("player thread for $device no longer running"); $running = 0; });
+	my $playerthr = threads->new(sub { $running = 1; eval { $player->run(); }; Logger::logger("player thread for $device no longer running: $@"); $running = 0; });
 	my $ret = {-thread=>$playerthr, -object=>$player, -running=>\$running};
 	return $ret;
 }
@@ -124,7 +136,7 @@ sub spawn_reader_thread {
 			);
 	# we set this to one here to avoid a race condition, whereby the thread hasn't started yet, and we still read -running as 0
 	my $running : shared = 1; 
-	my $readerthr = threads->new(sub { $running = 1; eval { $reader->run(); }; Logger::logger("reader thread for $device no longer running"); $running = 0; });
+	my $readerthr = threads->new(sub { $running = 1; eval { $reader->run(); }; Logger::logger("reader thread for $device no longer running: $@"); $running = 0; });
 	my $ret = {-thread=>$readerthr, -object=>$reader, -running=>\$running};
 	return $ret;
 }
@@ -134,6 +146,7 @@ sub server {
 				-dbfile=>$dbfile, 
 				-playerthrs=>$playerthrs,
 				-readerthrs=>$readerthrs,
+				-periodic=>$periodic,
 				-ref_dblock=>\$dblock, 
 			);
 
@@ -166,7 +179,9 @@ sub server {
 				my $discon = 0;
 				if (defined($input)) {
 					$input =~ s/\r?\n$//;
-					next if ($input =~ m/^$/);
+					$input = ('noop '.time()) if ($input =~ m/^$/);
+
+					# unfortuantely, some commands can't be implemented in ServerCommands.pm
 					last READLOOP if ($input =~ m/^shut/);
 
 					# the following if was added to test player/reader thread restarting upon death

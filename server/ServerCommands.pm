@@ -15,9 +15,10 @@ use Logger;
 
 my $BIN_DF = '/bin/df';
 
-# $Header: /home/cvs/thundaural/server/ServerCommands.pm,v 1.10 2004/01/16 09:35:37 jukebox Exp $
+# $Header: /home/cvs/thundaural/server/ServerCommands.pm,v 1.13 2004/01/30 10:23:33 jukebox Exp $
 
-my @cmds = sort qw/pause skip tracks queued devices play albums quit help noop volume status who name rip abort stats/;
+my @cmds = sort qw/pause skip tracks queued devices play albums quit help 
+		noop volume status who name rip abort stats randomize coverart/;
 
 sub new {
 	my $class = shift;
@@ -28,7 +29,7 @@ sub new {
 
 	$this->{-dbfile} = $opts{-dbfile};
 	die("no dbfile specified") if (!$this->{-dbfile});
-	die("unable to location dbfile ".$this->{-dbfile}) if (!-e $this->{-dbfile});
+	die("unable to locate dbfile ".$this->{-dbfile}) if (!-e $this->{-dbfile});
 
 	$this->{-dblock} = $opts{-ref_dblock};
 	die("dblock isn't a reference") if (!ref($this->{-dblock}));
@@ -55,6 +56,15 @@ sub new {
 		} else {
 			Logger::logger("$device has a valid readercmds queue");
 		}
+	}
+
+	$this->{-periodic} = $opts{-periodic};
+
+	if (!defined($this->{-periodic}->{-cmdqueue}) ||
+	    !$this->{-periodic}->{-cmdqueue}->isa('Thread::Queue')) {
+	    	Logger::logger("periodic task object doesn't have valid command queue");
+	} else {
+		Logger::logger("periodic task object has a valid cmdqueue");
 	}
 
 	$this->{-dbh} = DBI->connect("dbi:SQLite:dbname=".$this->{-dbfile},"","");
@@ -106,6 +116,55 @@ sub cmd_who {
 			($connections->{$c}->{outputs} || 0));
 	}
 	return $this->_format_list(201, 'client name inputs outputs', [@r]);
+}
+
+sub cmd_coverart {
+	my $this = shift;
+	my $input = shift;
+	
+	if ($input =~ m/^help/) {
+		return (200, "200 coverart <albumid> - dumps the cover art file as binary data\n");
+	}
+
+	my @x = split(/\s+/, $input);
+	my $albumid = shift @x;
+	return (400, "400 must specify an albumid\n") if (!$albumid);
+
+	my($ai, $caf);
+	eval {
+		lock(${$this->{-dblock}});
+		my $q = 'select albumid, coverartfile from albums where albumid = ?';
+		my $sth = $this->{-dbh}->prepare($q);
+		$sth->execute($albumid);
+		($ai, $caf) = $sth->fetchrow_array();
+		$sth->finish();
+	};
+
+	return (400, "400 album $albumid does not exist\n") if (!$ai);
+
+	return (400, "400 album $albumid does not have cover art\n") if (!$caf);
+
+	$caf = sprintf('%s/%s', Settings::storagedir(), $caf);
+	return (400, "400 cover art file is empty or non-existant\n") if (! -s $caf);
+
+	if (-x '/bin/file') {
+		# this is non-critical, but nice
+		my $type = `/bin/file $caf 2>/dev/null`;
+		if (!$type || ($type !~ m/JPEG image data/)) {
+			return (500, "500 unexpected file format, cover art file may be corrupted\n");
+		}
+	}
+
+	my $size = (-s $caf);
+	my $fc = '';
+	open(F, "<$caf");
+	while(!eof(F)) {
+		my $x = '';
+		read(F, $x, 10240);
+		$fc .= $x;
+	}
+	close(F);
+	return (202, ["202 $size bytes follow, please cache\n", $fc, ".\n"]);
 }
 
 sub cmd_stats {
@@ -205,7 +264,7 @@ sub cmd_name {
 		return (200, "200 name <name> - name your connection <name>\n");
 	}
 
-	($input) = $input =~ m/^(.{1,20})/;
+	($input) = $input =~ m/^(.{1,80})/;
 	if (!$input) {
 		$input = $connections->{$fh}->{name};
 	} elsif ($input =~ m/reset/) {
@@ -453,6 +512,55 @@ sub cmd_pause {
 	} else {
 		return (400, "400 unknown devicename $devicename\n");
 	}
+}
+
+sub cmd_randomize {
+	my $this = shift;
+	my $input = shift;
+
+	if ($input =~ m/^help/) {
+		return (200, "200 randomize [[<devicename>] for <m>] - play random songs on <devicename> for <m> minutes, no args will show current randomization information\n");
+	}
+
+	if (!$input) {
+		my $x = $this->{-periodic}->randomized_play_end();
+		my @r = ();
+		my @keys = qw/devicename endtime/;
+		foreach my $d (keys %$x) {
+			push(@r, sprintf("%s\t%s\n", $d, $x->{$d}));
+		}
+		return $this->_format_list(201, join(' ', @keys), [@r]);
+	}
+
+	my @x = split(/\s+/, $input);
+	my $devicename;
+	if ((scalar @x) < 2 || (scalar @x) > 3) {
+		return (401, "401 incorrect number of arguments\n");
+	}
+	if ((scalar @x) && $x[0] ne 'for') {
+		$devicename = shift @x;
+	}
+        if ($devicename) {
+                if (!$this->_is_valid_devicename_for_type($devicename, 'play')) {
+                        return (401, "401 invalid device $devicename\n");
+                }
+        } else {
+                $devicename = $this->_default_playdevice();
+        }
+	my $for = shift @x;
+	if (defined($for) && $for ne 'for') {
+		return (400, "401 syntax error when looking for \"for\" token\n");
+	}
+
+	my $minutes = pop @x;
+	if ($minutes !~ m/^\d+$/) {
+		return (400, "401 syntax error, \"$minutes\" doesn't look like a number\n");
+	}
+	my $s = $minutes * 60;
+	my $c = "random $s on $devicename";
+	my $cq = $this->{-periodic}->cmdqueue();
+	$cq->enqueue($c);
+	return (200, "200 requested randomized play on $devicename for $s seconds\n");
 }
 
 sub cmd_skip {
@@ -711,7 +819,8 @@ sub cmd_albums {
 	my @albumids = split(/\s+/, $input);
 
 	lock(${$this->{-dblock}});
-	my $q = "select albumid, performer, name, length, tracks, coverartfile from albums";
+	#my $q = "select albumid, performer, name, length, tracks, coverartfile from albums";
+	my $q = "select albumid, performer, name, length, tracks from albums";
 	if (@albumids) {
 		my @x = ();
 		foreach my $y (@albumids) {
@@ -727,11 +836,10 @@ sub cmd_albums {
 	$sth->execute;
 	my @r = ();
 	while(my $a = $sth->fetchrow_hashref()) {
-		my $caf = '';
-		if ($a->{coverartfile}) {
-			$caf = $a->{coverartfile};
-		}
-		my $x = sprintf "%d\t%s\t%s\t%d\t%d\t%s\n", $a->{albumid}, $a->{performer}, $a->{name}, $a->{length}, $a->{tracks}, $caf;
+		#my $caf = '';
+		#if ($a->{coverartfile}) { $caf = $a->{coverartfile}; }
+		#my $x = sprintf "%d\t%s\t%s\t%d\t%d\t%s\n", $a->{albumid}, $a->{performer}, $a->{name}, $a->{length}, $a->{tracks}, $caf;
+		my $x = sprintf "%d\t%s\t%s\t%d\t%d\n", $a->{albumid}, $a->{performer}, $a->{name}, $a->{length}, $a->{tracks};
 		push(@r, $x);
 	}
 	$sth->finish;
@@ -740,6 +848,11 @@ sub cmd_albums {
 
 sub cmd_quit {
 	my $this = shift;
+	my $input = shift;
+
+	if ($input =~ m/^help/) {
+		return (200, "200 quit - disconnect\n");
+	}
 
 	return (0, "200 goodbye\n");
 	# the goodbye line won't be printed

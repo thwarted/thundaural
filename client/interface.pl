@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-# $Header: /home/cvs/thundaural/client/interface.pl,v 1.11 2004/01/17 23:33:50 jukebox Exp $
+# $Header: /home/cvs/thundaural/client/interface.pl,v 1.13 2004/01/27 08:10:05 jukebox Exp $
 
 use strict;
 use warnings;
@@ -15,8 +15,6 @@ my $WIN_X = 1024;
 my $WIN_Y = 768;
 
 my $debug_timers = 0;
-
-use DBI;
 
 use SDL;
 #$SDL::DEBUG = 1;
@@ -50,6 +48,7 @@ use Page::Albums;
 use Page::Tracks;
 use Page::Ripping;
 use Page::NowPlaying;
+use Page::Random;
 
 # until user-defined events are working in SDL_perl
 our $E_CALLFUNCS=SDL::SDLK_BACKSPACE;
@@ -253,6 +252,17 @@ sub make_menu_widgets {
 		$gotoalbums->on_interior_event(SDL::SDL_MOUSEBUTTONDOWN, sub { $state->{current_page} = 'albums'; } );
 	}
 
+	my $gotorandom = new Button(
+			-name=>'gotorandom',
+			-canvas=>$app,
+			-bg=>$bgcolor,
+			-mask=>new SDL::Rect(-width=>90, -height=>90, -x=>300, -y=>2)
+			);
+	{
+        	$gotorandom->surface(0, $imgsurfaces->{'randomize'});
+		$gotorandom->on_interior_event(SDL::SDL_MOUSEBUTTONDOWN, sub { $state->{current_page} = 'random'; } );
+	}
+
 	my $st = new Button(
 			-name=>"stats",
 			-canvas=>$app,
@@ -299,11 +309,14 @@ sub make_menu_widgets {
 		$screensaver->on_interior_event(SDL::SDL_MOUSEBUTTONDOWN, \&start_screensaver);
 	}
 
-	return {'00-screensaver'=>$screensaver,
-		'00-stats'=>$st,
+	return {
+		'00-gotoidle'=>$gotoidle,
 		'00-gotoalbums'=>$gotoalbums,
+		'00-gotorandom'=>$gotorandom,
+		'00-stats'=>$st,
 		'00-gotoripping'=>$gotoripping,
-		'00-gotoidle'=>$gotoidle};
+		'00-screensaver'=>$screensaver,
+	};
 }
 
 sub queue_func_call {
@@ -406,6 +419,7 @@ sub setup_pages {
 	$pages->{'idle'} = new Page::NowPlaying(-server=>$iCon, -canvas=>$app, -rect=>$pagearea, -appstate=>$state, -albums=>$Albums);
 	$pages->{'stats'} = new Page::Stats(-server=>$iCon, -canvas=>$app, -rect=>$pagearea, -appstate=>$state);
 	$pages->{'ripping'} = new Page::Ripping(-server=>$iCon, -canvas=>$app, -rect=>$pagearea, -appstate=>$state);
+	$pages->{'random'} = new Page::Random(-server=>$iCon, -canvas=>$app, -rect=>$pagearea, -appstate=>$state);
 }
 
 sub load_images {
@@ -418,6 +432,8 @@ sub load_images {
    $imgsurfaces->{'start_screensaver'} = new SDL::Surface(-name=>"./images/start-screensaver03.png");
        $imgsurfaces->{'ripcdrom-busy'} = new SDL::Surface(-name=>'./images/ripcdrom-busy.png');
        $imgsurfaces->{'ripcdrom-idle'} = new SDL::Surface(-name=>'./images/ripcdrom-idle.png');
+
+           $imgsurfaces->{'randomize'} = new SDL::Surface(-name=>'./images/randomize.png');
 
         $imgsurfaces->{'nowplaying-0'} = new SDL::Surface(-name=>'./images/nowplaying-speaker0.png');
         $imgsurfaces->{'nowplaying-1'} = new SDL::Surface(-name=>'./images/nowplaying-speaker1.png');

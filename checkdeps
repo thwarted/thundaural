@@ -1,12 +1,14 @@
 #!/usr/bin/perl
 
-# $Header: /home/cvs/thundaural/checkdeps,v 1.1 2004/01/17 23:26:49 jukebox Exp $
+# $Header: /home/cvs/thundaural/checkdeps,v 1.4 2004/01/31 08:10:52 jukebox Exp $
 
 # just a little quick and dirty script to help you make sure you have all the 
 # dependancies installed.  It should really be better than this.  lots of code 
 # duplication here
 
 # and it should really generate settings/config files for the optional portions
+
+use Data::Dumper;
 
 $| = 1;
 
@@ -83,7 +85,7 @@ if ($check_server) {
 		&checking("accessiblity of", sprintf("%s (%s)", $dirs{$dir}, $dir));
 		my $x = `cd $dir > /dev/null 2>/dev/null ; echo \$?`;
 		$x += 0;
-		die("unable to cd to $dir") if ($x);
+		&mydie("unable to cd to $dir") if ($x);
 		open(X, ">$dir/thundauralxxx.$$.tmp") || &mydie("unable to write to $dir");
 		close(X);
 		unlink("$dir/thundauralxxx.$$.tmp");
@@ -137,13 +139,47 @@ if ($check_server) {
 
 if ($check_client) {
 	print "\nChecking dependancies for client...\n";
+
+	# I ripped this code out of Makefile.linux in the SDL_perl distribution
+	my @dirs=(
+		'/usr/local/include/SDL',
+		'/usr/local/include',
+		'/usr/include/SDL',
+		'/usr/include',
+	);
+
+	my %ext = (
+		SDL_image => { inc => 'HAVE_SDL_IMAGE', test => 'SDL_image.h', 'srcpage' => 'http://www.libsdl.org/projects/SDL_image/' },
+		SDL_ttf => { inc => 'HAVE_SDL_TTF', test => 'SDL_ttf.h', 'srcpage' => 'http://www.libsdl.org/projects/SDL_ttf/' },
+		SDL_gfx => { inc => 'HAVE_SDL_GFX', test => 'SDL_gfxPrimitives.h', 'srcpage' => 'http://www.ferzkopp.net/~aschiffler/Software/SDL_gfx-2.0/' },
+		# all my gfx come in PNG format
+		png => { inc => 'HAVE_PNG', test => 'png.h', 'srcpage' => 'http://www.rpmfind.net/linux/rpm2html/search.php?query=libpng' },
+		# for good measure
+		jpeg => { inc => 'HAVE_JPEG', test => 'jpeglib.h', 'srcpage' => 'http://www.rpmfind.net/linux/rpm2html/search.php?query=libjpeg' }, 
+	);      
+
+	for my $e ( keys %ext ) {
+		for my $d (@dirs) {
+	        	$ext{$e}{exists} ||= -e "$d/$ext{$e}{test}"
+		}
+	}
+
+	foreach my $e ( keys %ext ) {
+		&checking('headers for library', $e);
+		if (!$ext{$e}->{'exists'}) {
+			&mydie("Unable to locate $e libraries.  You can obtain source from ".$ext{$e}->{'srcpage'});
+		}
+		&ok;
+	}
+
 	&checking('perl module', 'SDL');
-	&havemodule('SDL') or &mydie("unable to locate module SDL.  Grab it from the Thundaural website download section.\n");
+	&havemodule('SDL') or &mydie("Unable to locate module SDL.  Grab the necessary version 2.0.2 from the Thundaural website download section.");
 	&ok;
 
 	&checking('SDL perl version');
-	use SDL;
-	die("SDL Perl version must be 2.0.2.  Grab it from the thundaural website download section.\n") if ($SDL::VERSION ne '2.0.2');
+	eval "use SDL;";
+	&mydie("Unable to locate SDL Perl.  Grab the necessary version 2.0.2 from the thundaural website download section.") if ($@ =~ m/^Can't locate/);
+	&mydie("SDL Perl version must be 2.0.2.  Grab it from the thundaural website download section.") if ($SDL::VERSION ne '2.0.2');
 	&ok($SDL::VERSION);
 
 	@modules = qw/SDL::Surface SDL::Constants 
@@ -160,24 +196,15 @@ if ($check_client) {
 
 	foreach my $prog (@programs) {
 		&checking('program', $prog);
-		&haveprogram($prog) or &mydie("unable to locate $prog\n");
-		&ok;
-	}
-
-	my @fonts = qw! 
-		/usr/share/fonts/msfonts/georgia.ttf 
-		/usr/share/fonts/msfonts/arial.ttf 
-	!;
-
-	foreach my $font (@fonts) {
-		&checking("font", $font);
-		(-s $font) || &mydie("unable to find font $font\n");
+		&haveprogram($prog) or &mydie("unable to locate $prog");
 		&ok;
 	}
 }
 
 
 sub runogg123check {
+	# god damn, it is super complex to check for this
+	# if anyone has a better idea, let me know
 
 	my $SCRTMP = "/tmp/testogg123.$$.sh";
 	
@@ -190,7 +217,7 @@ sub runogg123check {
 TMPF=/tmp/testogg123.$$.out
 touch $TMPF
 if [ ! -f $TMPF ]; then
-        exit 8
+	exit 8
 fi
 /usr/bin/ogg123 --remote - </dev/null >$TMPF 2>&1 &
 CHP=$!
@@ -198,19 +225,19 @@ CHP=$!
 RET=0
 grep -F 'unrecognized option' $TMPF >/dev/null 2>/dev/null
 if [ $? == 0 ]; then
-        # ogg123 doesn't support --remote
-        RET=1
+	# ogg123 doesn't support --remote
+	RET=1
 else
-        grep -F '@E Unknown command' $TMPF >/dev/null 2>/dev/null
-        if [ $? == 0 ]; then
-                # ogg123's remote patch isn't patched to fix stdin close
-                RET=2
-        fi
+	grep -F '@E Unknown command' $TMPF >/dev/null 2>/dev/null
+	if [ $? == 0 ]; then
+	        # ogg123's remote patch isn't patched to fix stdin close
+	        RET=2
+	fi
 fi
 if [ -f $TMPF ]; then
-        rm -f $TMPF
+	rm -f $TMPF
 fi
-echo "ret = $ret"
+#echo "ret = $RET"
 exit $RET # it is patched!
 
 EOF

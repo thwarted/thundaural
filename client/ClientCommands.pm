@@ -27,11 +27,13 @@ sub new {
 	$this->{status} = {};
 	$this->{lasttrackref} = {};
 	$this->{stats} = {};
+	$this->{random} = {};
 
 	$this->{statuslastupdate} = 0;
 	$this->{queuedonlastupdate} = 0;
 	$this->{deviceslastupdate} = 0;
 	$this->{statslastupdate} = 0;
+	$this->{randomlastupdate} = 0;
 
 	$this->{errorfunc} = $opts{-errorfunc};
 	$this->{recoveredfunc} = $opts{-recoveredfunc};
@@ -77,7 +79,8 @@ sub _ensureconnect {
 				}
 			}
 			my $h = $this->{ihn};
-			print $h "name jbsdl.$$\n";
+			my $me = `/bin/hostname`; chomp $me;
+			print $h "name $me($$,jbsdl)\n";
 			my $x = <$h>; # dump response line
 			last if defined($x);
 		}
@@ -118,6 +121,23 @@ sub _populate_status {
 	} else {	
 		Logger::logger("unable to get status, result was $st");
 		$this->{status} = {};
+	}
+}
+
+sub _populate_random {
+	my $this = shift;
+	return if (exists($this->{randomlastupdate}) && $this->{randomlastupdate}+5 > time());
+	my $st = $this->_do_cmd('randomize');
+	if (ref($st) eq 'ARRAY') {
+		$this->{random} = {};
+		foreach my $x (@$st) {
+			my $dn = $x->{devicename};
+			$this->{random}->{$dn} = $x->{endtime};
+		}
+		$this->{randomlastupdate} = time();
+	} else {
+		Logger::logger("unable to get randomization, result was $st");
+		$this->{random} = {};
 	}
 }
 
@@ -175,6 +195,28 @@ sub _populate_stats {
 		Logger::logger("unable to get stat info from server, result was $x");
 		$this->{stats} = {};
 	}
+}
+
+sub random_play {
+	my $this = shift;
+	my $minutes = shift;
+	my $devicename = shift;
+
+	return 0 if (!$devicename);
+	return 0 if ($minutes !~ m/^\d+$/);
+	$minutes += 0;
+
+	$this->{random} = {};
+	$this->{randomlastupdate} = -10;
+	$this->_do_cmd("randomize $devicename for $minutes");
+}
+
+sub will_random_play_until {
+	my $this = shift;
+	my $dn = shift;
+
+	$this->_populate_random();
+	return (exists($this->{random}->{$dn}) ? $this->{random}->{$dn} : undef);
 }
 
 sub tracks {
@@ -384,6 +426,23 @@ sub skip {
 	return (200 <= $result && $result <= 299) ? 1 : 0;
 }
 
+sub coverart {
+	my $this = shift;
+	my $albumid = shift;
+	my $outputfile = shift;
+
+	my $bytes = $this->_do_cmd("coverart $albumid");
+	if (!$bytes || $bytes =~ m/^\d{3}$/) {
+		return undef;
+	}
+
+        open(F, ">$outputfile");
+        print F $bytes;
+        close(F);
+
+	return $outputfile;
+}
+
 sub _do_cmd {
 	my $this = shift;
 	my $cmd = join(' ', @_);
@@ -398,9 +457,28 @@ sub _do_cmd {
 		next if (!defined($input));
 		chomp $input;
 		#print "input = \"$input\"\n";
-		($rescode, $more) = $input =~ m/^(\d{3}) (count)?/;
+		($rescode, $more) = $input =~ m/^(\d{3}) (count|(\d+) bytes follow)?/;
 		$rescode = 0 if !defined($rescode);
+		if ($rescode == 202) { # binary data
+			my($size) = $more =~ m/^(\d+) bytes/;
+			if (!$size) {
+				return '';
+			}
+			my $bytes = '';
+			while(length($bytes) < $size) {
+				my $i = '';
+				my $x = read($h, $i, 1);
+				next RECONNECT if (!defined($x) || $x != 1);
+				$bytes .= $i;
+			}
+			$input = <$h>; 
+			next RECONNECT if (!defined($input));
+			chomp $input;
+			next RECONNECT if ($input !~ m/^\.$/);
+			return $bytes;
+		}
 		if (200 <= $rescode && $rescode <= 299) {
+			# 202 has already been handled, we're really handling 200 and 201 here
 			last RECONNECT if (!defined($more));
 			($keylist) = $input =~ m/\(([^()]+)\)/;
 			@keys = split(/\s+/, $keylist);

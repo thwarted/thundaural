@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-# $Header: /home/cvs/thundaural/client/Page/Stats.pm,v 1.1 2004/01/16 09:35:02 jukebox Exp $
+# $Header: /home/cvs/thundaural/client/Page/Stats.pm,v 1.3 2004/01/30 10:10:58 jukebox Exp $
 
 package Page::Stats;
 
@@ -34,12 +34,12 @@ use POSIX qw(strftime);
 
 our @ISA = qw( Page );
 
-my $statsfontfile = "/usr/share/fonts/msfonts/georgia.ttf";
+my $statsfontfile = "./fonts/Vera.ttf";
 my $statsfontsize = 30;
 my $xbg = new SDL::Color(-r=>160,-g=>160,-b=>160);
 my $statsfont = new SDL::TTFont(-name=>$statsfontfile, -size=>$statsfontsize, -bg=>$xbg, -fg=>new SDL::Color(-r=>0,-g=>0,-b=>0));
 
-my $progressfontfile = "/usr/share/fonts/msfonts/arial.ttf";
+my $progressfontfile = "./fonts/Vera.ttf";
 my $progressfontsize = 14;
 my $progressfont = new SDL::TTFont(-name=>$progressfontfile, -size=>$progressfontsize, -bg=>new SDL::Color(-r=>166, -g=>165, -b=>165), -fg=>new SDL::Color(-r=>32,-g=>32,-b=>32));
 
@@ -171,51 +171,6 @@ sub update {
 		}
 		$blit = 1;
 	}
-
-		#my $s = {'current' => '0','devicename' => 'cdrom','genre' => 'rock','length' => '358','name' => 'Nothing Natural','percentage' => '40.24','performer' => 'Lush','popularity' => '0','rank' => '0','started' => '1073762898','state' => 'ripping','trackid' => '?','trackref' => '1/4','type' => 'read','volume' => 'with error correction'};
-
-#			$this->widget("00-ripaction-$reader")->frame($this->busy($reader) ? 'abort' : 'start');
-#			my @lines;
-#			if ($s->{state} eq 'idle') {
-#				$this->widget("99-ripprogress-$reader")->hide(1);
-#				@lines = ("Insert a disc and hit the start button to rip.");
-#				push(@lines, " ", $s->{volume}, " ") if ($s->{volume});
-#				@lines = $this->wrap($nexttfont, $this->{-srect}->width()-20, $this->{-srect}->height()-20, @lines);
-#			} elsif ($s->{state} eq 'cleanup') {
-#				@lines = $this->wrap($nexttfont, $this->{-srect}->width()-20, $this->{-srect}->height()-20, "cleaning up");
-#			} else {
-#				if ($s->{trackref} =~ m/\//) {
-#					my ($ct, $tt) = $s->{trackref} =~ m/(\d+)\/(\d+)/;
-#					push(@lines, sprintf('Ripping track %d of %d %s', $ct, $tt, $s->{volume}));
-#					push(@lines, ' ');
-#					push(@lines, sprintf('%s - %s', $s->{performer}, $s->{name}));
-#					push(@lines, sprintf('%s of %s', $this->sectotime($s->{length}), $s->{genre}));
-#					push(@lines, " ");
-#                   			my $ststr = strftime '%H:%M:%S', localtime($s->{started});
-#					#push(@lines, sprintf("started ripping at %s, %s ago", $ststr, $this->sectotime(time() - $s->{started})));
-#					push(@lines, sprintf('started ripping at %s', $ststr));
-#					push(@lines, sprintf('%d errors at current sector', $s->{current}));
-#				} else {
-#					push(@lines, sprintf('%s ', $s->{volume}));
-#				}
-#				@lines = $this->wrap($nexttfont, $this->{-srect}->width()-20, $this->{-srect}->height()-20, @lines);
-#
-#				if ($s->{percentage}) {
-#					my $w = $this->widget("99-ripprogress-$reader");
-#					$w->hide(0);
-#					$w->pctfull($s->{percentage} / 100);
-#					# the rank holds the current ripping speed
-#					$w->label(sprintf('%d%% - speed %.2fx', $s->{percentage}, $s->{rank}));
-#				}
-#			}
-#			$g += $this->print_lines($x, $nexttfont, 10, $g, @lines);
-#
-#			$g += 60;
-#			$this->{-last}->{$reader} = $ss;
-#			$this->find_coverartfile($reader);
-#			$blit = 1;
-#		}
-#	}
 
 	if ($blit) {
 		$x->blit(0, $this->{-canvas}, $this->{-srect});

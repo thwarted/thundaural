@@ -1,7 +1,7 @@
 
 package Albums;
 
-# $Header: /home/cvs/thundaural/client/Albums.pm,v 1.6 2004/01/17 23:24:46 jukebox Exp $
+# $Header: /home/cvs/thundaural/client/Albums.pm,v 1.8 2004/01/30 10:16:24 jukebox Exp $
 
 use strict;
 use warnings;
@@ -34,6 +34,7 @@ sub _populate {
 	if (ref($x) eq 'ARRAY') {
 		$this->{albums} = {};
 		foreach my $al (@$x) {
+			$al->{coverartfile} = $this->_coverart_localfile($al->{albumid});
 			$this->{albums}->{$al->{albumid}} = $al;
 		}
 		$this->{sorted_performer} = $this->_sort_by('performer', 'name');
@@ -128,8 +129,26 @@ sub coverartfile($) {
 	my $this = shift;
 	my $albumid = shift;
 
-	$this->_populate();
+
+	my $tmpfile = $this->_coverart_localfile($albumid);
+	if (! -s $tmpfile) {
+		my $x = $this->{iCon}->coverart($albumid, $tmpfile);
+		if (defined($x) && ($tmpfile eq $x)) {
+			$this->{albums}->{$albumid}->{coverartfile} = $x;
+			return $x;
+		}
+	}
 	return $this->{albums}->{$albumid}->{coverartfile};
+
+	#$this->_populate();
+	#return $this->{albums}->{$albumid}->{coverartfile};
+}
+
+sub _coverart_localfile {
+	my $this = shift;
+	my $albumid = shift;
+
+	return sprintf("/tmp/thundaural-coverartcache-album%06d.jpg", $albumid);
 }
 
 sub trackids {
