@@ -408,7 +408,7 @@ sub playing_on {
     devicename=>'main',
     type=>'play',
     state=>'idle',
-    volume=>int(((time() - $main::starttime) % 123) /123 * 100),
+    volume=>67, #int(((time() - $main::starttime) % 123) /123 * 100),
     trackref=>'6/1',
     performer=>'The Beatles',
     name=>"Sgt. Pepper's Lonely Hearts Club Band",
