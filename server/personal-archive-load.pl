@@ -7,10 +7,8 @@ use File::Basename qw(basename);
 use Data::Dumper;
 use Getopt::Long;
 use Carp qw(cluck);
-#use MP3::Info;
-#use Ogg::Vorbis::Header::PurePerl;
 
-$SIG{__WARN__} = sub { cluck(@_); };
+#$SIG{__WARN__} = sub { cluck(@_); };
 
 $Data::Dumper::Indent = 0;
 
@@ -20,16 +18,18 @@ my @matchorder = ();
 my $fullpath = 0;
 my $mp3 = 0;
 my $vorbis = 0;
-my $metadata_location = 'filename';
+my @metadata_location = ();
+my $useaomdefaults = 0;
 
 my %options = (
+    'aom'=>\$useaomdefaults,
     'mp3'=>\$mp3,
     'vorbis'=>\$vorbis,
     'help'=>\&usage,
     'pattern=s'=>\$pattern,
     'matchorder=s'=>\@matchorder,
     'fullpath!'=>\$fullpath,
-    'metadata=s'=>\$metadata_location,
+    'metadata=s'=>\@metadata_location,
 );
 
 GetOptions(%options) || &usage;
@@ -65,16 +65,19 @@ foreach my $albumdir (@ARGV) {
             #print "$file\n";
 
             my $audioinfo = &get_audio_info($file);
-            #print "\t- AUDI: ".Dumper($audioinfo)."\n";
+            print "\t- AUDI: ".Dumper($audioinfo)."\n";
 
-            my $metadata;
-            if ($metadata_location eq 'tags') {
-                $metadata = &try_tags($file);
-                #print "\t- TAGS: ".Dumper($metadata)."\n";
-            } else {
-                $metadata = &try_filename($file);
-                #print "\t- FLNM: ".Dumper($metadata)."\n";
+            my $metadata = {};
+            foreach my $loc (@metadata_location) {
+                if ($loc eq 'tags') {
+                    &try_tags($file, $metadata);
+                }
+                if ($loc eq 'filename') {
+                    &try_filename($file, $metadata);
+                }
+                print Dumper($metadata)."\n";
             }
+            print "\t- INFO: ".Dumper($metadata)."\n";
             if ($audioinfo) {
                 $track->{length} = $audioinfo->{length};
                 if ($track->{length} != int($track->{length})) {
@@ -99,6 +102,7 @@ foreach my $albumdir (@ARGV) {
             }
             push(@$tracks, $track);
         }
+        print "\n\n";
     }
 
     my @t = sort { $a->{tracknum} <=> $b->{tracknum} } @$tracks;
@@ -175,17 +179,19 @@ sub get_audio_info {
 
 sub try_tags {
     my $file = shift;
-    my $tagsx;
+    my $info = shift;
 
+    print "-1\n";
+    my $tagsx = {};
     if ($mp3) {
         $tagsx = MP3::Info::get_mp3tag($file);
-        if ($tagsx) {
-            return $tagsx;
-        }
     }
     if ($vorbis) {
+        print "0\n";
         my $o = new Ogg::Vorbis::Header::PurePerl($file);
+        print "1\n";
         if ($o) {
+            print "2\n";
             $tagsx = {};
             my @k = $o->comment_tags();
             #title=Echoes (Life in the Mines)
@@ -199,20 +205,23 @@ sub try_tags {
                 $kx =~ s/^tracknumber$/TRACKNUM/ig;
                 $tagsx->{uc $kx} = join(', ', $o->comment($k));
             }
-            return $tagsx;
         }
     }
-    my $tags = eval {
-        &get_tags($file);
-    } || {};
-    if ($@) {
-        warn($@);
-        return {};
+    if (!defined($tagsx) || !(scalar %$tagsx)) {
+        $tagsx = eval {
+            &get_testing_tags($file);
+        } || {};
+        if ($@) {
+            warn($@);
+            return $info;
+        }
     }
-    return $tags;
+    foreach my $k (%$tagsx) {
+        $info->{$k} = $tagsx->{$k};
+    }
 }
 
-sub get_tags {
+sub get_testing_tags {
     my $file = shift;
 
     my $tagmaps = {
@@ -264,27 +273,31 @@ sub trim {
 
 sub try_filename {
     my $file = shift;
+    my $metadata = shift;
+
     if (!$fullpath) {
         $file = basename($file);
     }
-    my $v = {};
     if (my @a = $file =~ m/$pattern/) {
-        #print "\t".Dumper(\@a)."\n";
-        #print "\t".Dumper(\@matchorder)."\n";
         foreach my $m (@matchorder) {
             my $a = shift @a;
-            $v->{uc $m} = $a if ($m ne 'undef');
+            $metadata->{uc $m} = $a if ($m ne 'undef');
         }
     }
-    return $v;
+    return $metadata;
 }
 
 
 sub validate_options {
+    if ($useaomdefaults) {
+        @metadata_location = qw(tags filename);
+        @matchorder = qw(tracknum);
+        $pattern = '^(\d+)_.+$';
+    }
     if (! scalar @matchorder) {
         @matchorder = qw(artist album tracknum title);
     }
-    @matchorder = split(',', join(',', @matchorder));
+    @matchorder = split(/,/, join(',', @matchorder));
     foreach my $mo (@matchorder) {
         die("\"$mo\" isn't a valid matchorder compoent\n")
             if ($mo ne 'artist'
@@ -304,11 +317,18 @@ sub validate_options {
     die("\"$pattern\" doesn't appear to be a valid perl regular expression\n")
         if ($@);
 
-    if ($metadata_location !~ m/(filename|tags)/) {
-        die("--metadata needs filename or tags argument");
+    @metadata_location = split(/,/,join(',',@metadata_location));
+    foreach my $m (@metadata_location) {
+        if ($m !~ m/^(filename|tags)$/) {
+            die("--metadata options can only be 'filename' and 'tags'");
+        }
     }
 
-    if (!$mp3 && !$vorbis && $metadata_location eq 'tags') {
+    if (!scalar @metadata_location) {
+        @metadata_location = qw(filename);
+    }
+
+    if (!$mp3 && !$vorbis && &in('tags', \@metadata_location)) {
         $mp3 = 1;
         $vorbis = 1;
     }
@@ -324,6 +344,18 @@ sub validate_options {
     }
 }
 
+sub in {
+    my $needle = shift;
+    my $haystack = shift;
+
+    foreach my $x (@$haystack) {
+        if ($needle eq $x) {
+            return 1;
+        }
+    }
+    return undef;
+}
+
 sub usage {
 print <<"EOF";
 $0 [<option> ...] <directory> ...
@@ -337,8 +369,18 @@ in it.
 
 Recognized options are:
 
-  --metadata <loc>          get metadata from <loc>, where <loc> can be 
+  --aom                      setrovide defaults for files obtained from 
+                              AllofMP3.com.  No other options need to be
+                              provided in this case.  These settings are:
+                                    --metadata tags,filename
+                                    --pattern '^(\\d+)_.+$'
+                                    --matchorder tracknum
+
+  --metadata <loc>,<loc>..   get metadata from <loc>, where <loc> can be 
                               "filename" or "tags", default "filename"
+                              if specified more than once, they will be tried
+                              in the order given, with data found later
+                              overriding data found earlier
 
 For "--metadata filename":
   --pattern <pat>           perl regex with paren'ed subexpressions
@@ -357,7 +399,6 @@ If neither of the above are given, both will be tried.  You can use these
 option to force use of a module and not fail if you don't have the other
 one installed, and all your files are in that format.
 
-For 
 The default pattern is 
 
   ^(.+) - (.+) - (\\d+) - (.+)\\.mpe?3\$
