@@ -199,10 +199,13 @@ sub draw {
             }
         }
         $o->{surf}->fill($fillrect, $o->{fgcolor});
-        if ($o->{label} && ref($o->{font}) eq 'SDL::TTFont') {
+        if (ref($o->{label}) eq 'CODE') {
+            my $f = $o->{label};
+            &$f($this, $o->{surf});
+        } elsif ($o->{label} && ref($o->{font}) eq 'SDL::TTFont') {
             my $w = $o->{font}->width($o->{label});
             my $x = ($area->width() - $w) / 2;
-            $o->{font}->print($o->{surf}, $x, 0, $o->{label});
+            $o->{font}->print($o->{surf}, $x, int(($area->height() - $o->{font}->height() ) / 2), $o->{label});
         }
         $this->{_pb}->{changed} = 0;
         return $this->request_blit(surface=>$o->{surf}, area=>$area, sync=>1, name=>$this->name());
