@@ -18,7 +18,7 @@ my $storagedir = Thundaural::Server::Settings::storagedir();
 Thundaural::Logger::init('stderr');
 
 my $dbh;
-{ # set up the database
+{ # set up the database, should really verify the database version here
     my $dbfile = Thundaural::Server::Settings::dbfile();
     $dbh = DBI->connect("dbi:SQLite:dbname=$dbfile","","", {PrintError=>0, RaiseError=>0});
 }
