@@ -11,7 +11,9 @@ our @EXPORT_OK = qw(sectotime english_rank);
 
 sub sectotime {
     my $sec = shift || 0;
-    my $short = shift || 0;
+    my %o = @_;
+    my $short = $o{short};
+    my $round = $o{round};
 
     my $min = int($sec / 60);
     $sec = $sec % 60;
