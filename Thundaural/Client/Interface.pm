@@ -27,6 +27,7 @@ sub new {
     $this->{server} = $o{host} || 'jukebox';
     $this->{port} = $o{port} || 9000;
     $this->{clientlabel} = 'newclient';
+    $this->{tmpdir} = $o{tmpdir};
 
     $this->{errorfunc} = $o{errorfunc} || undef;
 
@@ -54,6 +55,11 @@ sub new {
     $this->_clear_input();
 
     return $this;
+}
+
+sub tmpdir {
+    my $this = shift;
+    return $this->{tmpdir};
 }
 
 sub clear_cache {
