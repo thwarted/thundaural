@@ -1,0 +1,280 @@
+#!/usr/bin/perl
+
+BEGIN {
+    if (my($dir) = $0 =~ m/^(.+)\/[^\/]+$/) {
+        eval "use lib \"$dir/lib\"";
+    }
+}
+
+use strict;
+use warnings;
+
+use Getopt::Long qw(:config pass_through);
+use Data::Dumper;
+use File::Basename;
+use Thundaural::Util;
+use Thundaural::Server::Settings;
+
+use Thundaural::Logger qw(logger);
+
+use DBI;
+
+my $storagedir = Thundaural::Server::Settings::storagedir();
+Thundaural::Logger::init('stderr');
+
+my $dbh;
+{ # set up the database, should really verify the database version here
+    my $dbfile = Thundaural::Server::Settings::dbfile();
+    $dbh = DBI->connect("dbi:SQLite:dbname=$dbfile","","", {PrintError=>0, RaiseError=>0});
+}
+
+my $list_albums;
+my $show_album;
+my $delete_album;
+my $remove_files;
+{ # figure out what we want to do
+    my %options = (
+                'help'=>\&usage,
+                'albums'=>\$list_albums,
+                'showalbum=i'=>\$show_album,
+                'deletealbum=i'=>\$delete_album,
+                'removefiles'=>\$remove_files,
+   );
+   exit unless GetOptions(%options);
+}
+
+if ($list_albums) {
+    &list_albums();
+    exit;
+}
+
+if ($show_album) {
+    &album_info($show_album);
+    exit;
+}
+
+if ($delete_album) {
+    &delete_album($delete_album);
+    exit;
+}
+
+&usage();
+exit;
+
+sub usage {
+    print <<"EOF";
+$0 [options] ...
+Takes all the standard config file arguments (--help for details).
+Reads the server configuration file before command line options.
+
+  --help             this help message
+  --more-help        additional, global options
+  --albums           list all albums in the database
+  --showalbumd <i>   show all information for albumid <i>
+
+  --deletealbum <i>  pernamently delete album <i>
+
+  --removefiles      remove files from the storage dir,
+                     store them in a unique directory for
+                     manual removal later
+EOF
+    exit;
+}
+
+sub list_albums {
+    my $q = "select p.*, a.*, p.name as performername, count(i.albumid) as images
+            from albums a left join albumimages i on a.albumid = i.albumid 
+                 left join performers p on a.performerid = p.performerid
+            group by a.albumid
+            order by p.sortname, a.albumid";
+    my $sth = $dbh->prepare($q);
+    $sth->execute();
+
+    my($r, $name, $pname);
+format AL_TOP =
+@>>> @<<<<<<<<<<<<<<<<<<<<<<<<<<<   @<<<<<<<<<<<<<<<<<<<<<<<<<<< @>>>>> @<<<<<
+qw(ID Performer AlbumName Tracks Images)
+------------------------------------------------------------------------------
+.
+format AL =
+@>>> ^<<<<<<<<<<<<<<<<<<<<<<<<<<<   ^<<<<<<<<<<<<<<<<<<<<<<<<<<< @>>>>> @<<<<<
+$r->{albumid}, $pname, $name, $r->{tracks}, $r->{images}
+~     ^<<<<<<<<<<<<<<<<<<<<<<<<<<    ^<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+     $pname,                        $name
+.
+    $- = 0;
+    $~ = 'AL';
+    $^ = 'AL_TOP';
+    $= = 25;
+    while($r = $sth->fetchrow_hashref()) {
+        $name = $r->{name};
+        $pname = $r->{performername};
+        $r->{images} += 0;
+        write;
+    }
+    $sth->finish;
+}
+
+sub album_info {
+    my $albumid = shift;
+    my %o = @_;
+    my $short = $o{short};
+
+    my $q = "select p.*, a.*, p.name as performername 
+             from albums a, performers p 
+             where a.performerid = p.performerid and a.albumid = ? 
+             limit 1";
+    my $sth = $dbh->prepare($q);
+    $sth->execute($albumid);
+    my $a = $sth->fetchrow_hashref();
+    $sth->finish;
+
+    if (keys %$a) {
+        my $len = Thundaural::Util::sectotime($a->{'length'});
+        my $cddbid = $a->{cddbid} || '[unknown]';
+        my $cdindexid = $a->{cdindexid} || '[unknown]';
+        print <<"EOF";
+Album ID : $a->{albumid}
+Name     : $a->{name}
+Performer: $a->{performername} ($a->{sortname})
+Source   : $a->{source} (cddb $cddbid, cdindex $cdindexid)
+Tracks   : $a->{tracks}
+Length   : $len
+EOF
+
+        if (!$short) {
+            print "\nImages/cover art:\n";
+            $q = "select * from albumimages where albumid = ? order by preference";
+            $sth = $dbh->prepare($q);
+            $sth->execute($a->{albumid});
+            my $if = 0;
+            while(my $i = $sth->fetchrow_hashref()) {
+                my $x = '';
+                $x = " (missing)" unless (-s "$storagedir/".$i->{filename});
+                printf('%2d: %s%s%s%s', $i->{preference}, $i->{label}, "\n\t", $i->{filename}, "$x\n");
+                $if++;
+            }
+            $sth->finish;
+            if (!$if) {
+                print "This album has not been assigned any images.\n";
+            }
+
+            print "\nTracks:\n";
+            $q = "select p.*, t.* 
+                  from tracks t 
+                       left join performers p on t.performerid = p.performerid
+                  where albumid = ?
+                  order by albumorder";
+            $sth = $dbh->prepare($q);
+            $sth->execute($a->{albumid});
+            while(my $t = $sth->fetchrow_hashref()) {
+                my $x = '';
+                $x = " (missing)" unless (-s "$storagedir/".$t->{filename});
+                my $pname = ($t->{performerid} != $a->{performerid}) ? " (".$t->{performername}.")" : '';
+                printf('%2d: %s%s%s', $t->{albumorder}, $t->{name}, $pname, "\n");
+                print("    file: \"".$t->{filename}."\"$x\n");
+                print("    length: ".Thundaural::Util::sectotime($t->{'length'}, short=>1));
+                if ($t->{rank}) {
+                    print("; rank: ".$t->{rank}."; popularity: ".$t->{popularity}."\n");
+                } else {
+                    print("; not ranked, never played\n");
+                }
+            }
+            $sth->finish;
+        }
+        return 1;
+    } else {
+        print "Album $albumid not found\n";
+        return 0;
+    }
+}
+
+sub delete_album {
+    my $albumid = shift;
+
+    $albumid += 0;
+
+    exit unless &album_info($albumid, short=>1);
+    my $q = "select trackid from tracks where albumid = ?";
+    my $sth = $dbh->prepare($q);
+    $sth->execute($albumid);
+    my @tracks = ();
+    while (my $t = $sth->fetchrow_hashref()) {
+        push(@tracks, $t->{trackid});
+    }
+    $sth->finish;
+
+    my @deletefiles = ();
+
+    $q = "delete from playhistory where trackid in (".join(',', @tracks).")";
+    print "$q\n";
+    $dbh->do($q);
+
+    $q = "delete from albums where albumid = $albumid";
+    print "$q\n";
+    $dbh->do($q);
+
+    $q = "delete from trackattributes where trackid in (".join(',', @tracks).")";
+    print "$q\n";
+    $dbh->do($q);
+
+    $q = "select filename from albumimages where albumid = $albumid";
+    $sth = $dbh->prepare($q);
+    $sth->execute();
+    while(my($f) = $sth->fetchrow_array()) {
+        push(@deletefiles, "$storagedir/$f") if (-e "$storagedir/$f");
+    }
+    $sth->finish;
+
+    $q = "delete from albumimages where albumid = $albumid";
+    print "$q\n";
+    $dbh->do($q);
+
+    $q = "select filename from tracks where albumid = $albumid";
+    $sth = $dbh->prepare($q);
+    $sth->execute();
+    while(my($f) = $sth->fetchrow_array()) {
+        push(@deletefiles, "$storagedir/$f") if (-e "$storagedir/$f");
+    }
+    $sth->finish;
+    $q = "delete from tracks where albumid = $albumid";
+    print "$q\n";
+    $dbh->do($q);
+
+    if (scalar @deletefiles) {
+        if (!$remove_files) {
+            print "the following files can be deleted:\n";
+            foreach (@deletefiles) {
+                print "\t$_\n";
+            }
+        } else {
+            print "moving files...\n";
+            my $tdir = "$storagedir/removed-albumid-$albumid.".time();
+            mkdir $tdir, 0775;
+            foreach my $of (@deletefiles) {
+                print "\t$of\n";
+                my $bn = File::Basename::basename($of);
+                rename $of, "$tdir/$bn";
+            }
+            print "files have been moved to $tdir\n";
+        }
+    }
+}
+
+
+#    Thundaural Jukebox
+#    Copyright (C) 2003-2005  Andrew A. Bakun
+#
+#    This program is free software; you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation; either version 2 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program; if not, write to the Free Software
+#    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA

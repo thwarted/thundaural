@@ -35,10 +35,41 @@ sub strcleanup {
     return $str;
 }
 
+sub sectotime {
+    my $sec = shift || 0;
+    my %o = @_;
+    my $short = $o{short};
+    my $round = $o{round};
+
+    my $min = int($sec / 60);
+    $sec = $sec % 60;
+    my $hrs = int($min / 60);
+    $min = $min % 60;
+
+    if ($short) {
+        my @ret = ();
+        push(@ret, $hrs) if ($hrs);
+        push(@ret, sprintf("%02d", $min));
+        push(@ret, sprintf("%02d", $sec));
+        return join(":", @ret);
+    } else {
+        my @ret = ();
+        push(@ret, sprintf('%d hour%s', $hrs, $hrs == 1 ? '':'s')) if ($hrs);
+        push(@ret, sprintf('%d minute%s', $min, $min == 1 ? '':'s')) if ($min);
+        push(@ret, sprintf('%d second%s', $sec, $sec == 1 ? '':'s')) if ($sec);
+        if ((scalar @ret) > 1) {
+            my $xl = pop @ret;
+            my $xs = pop @ret;
+            push(@ret, "$xs and $xl");
+        }
+        return join(', ', @ret);
+    }
+}
+
 1;
 
 #    Thundaural Jukebox
-#    Copyright (C) 2003-2004  Andrew A. Bakun
+#    Copyright (C) 2003-2005  Andrew A. Bakun
 #
 #    This program is free software; you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
