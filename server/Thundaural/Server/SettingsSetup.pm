@@ -38,7 +38,7 @@ our $_vars = {
 	};
 
 my %options = (
-	'help'=>\&usage,
+	'more-help'=>\&usage,
 	'config=s'=>\&load_config,
 	'prog=s'=>\&set_prog,
 	'cmd=s'=>\&set_cmd,
@@ -61,7 +61,8 @@ sub usage {
 	my $cfgs = join("\n    ", @configfiles);
 	print <<"EOF";
 $0 <option> ...
-  --help              *display usage and exit
+  --help               program specific help
+  --more-help          additional, global options
 
   --config <file>      read more options from <file>
   --device <s>         define a device

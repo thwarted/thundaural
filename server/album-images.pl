@@ -33,7 +33,7 @@ my $list_albums = 0;
 my $show_album = 0;
 { # figure out what we want to do
     my %options = (
-                'more-help'=>\&usage,
+                'help'=>\&usage,
                 'only-needed'=>\$show_only_needed,
                 'list-albums'=>\$list_albums,
                 'show-album'=>\$show_album,
@@ -64,7 +64,8 @@ $0 [options] ...
 Takes all the standard config file arguments (--help for details).
 Reads the server configuration file before command line options.
 
-  --more-help       this help message
+  --help            this help message
+  --more-help       additional, global options
   --albumid <i>     focus on albumid <i>
   --list-albums     list all albums in the database
   --show-album      print info on the focused album
