@@ -11,7 +11,6 @@ use File::Basename;
 use Thundaural::Server::Settings;
 
 use Thundaural::Logger qw(logger);
-use Thundaural::Server::DatabaseSetup;
 
 use DBI;
 
