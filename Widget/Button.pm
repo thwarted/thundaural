@@ -147,8 +147,7 @@ sub _mk_dep_frame {
     $dup = SDL::Tool::Graphic::zoom(undef, $dup, $subsize, $subsize, 1);
     my $new = new SDL::Surface(-depth=>24, -width=>$f->width(), -height=>$f->height());
     $new->display_format();
-    $main::theme->draw_background(canvas=>$new, source=>new SDL::Rect($this->area()->tohash()), dest=>0);
-    #$new->fill(0, new SDL::Color(-r=>160, -b=>160, -g=>160));
+    $this->container()->draw_background(canvas=>$new, source=>new SDL::Rect($this->area()->tohash()), dest=>0);
     my $margin = (1.0 - $subsize) / 2;
     $dup->blit(0, $new, new SDL::Rect(-x=>$f->width()*$margin, -y=>$f->height()*$margin, -width=>$f->width()*$subsize, -height=>$f->height()*$subsize));
     $this->set_depressed_frame(frame=>0, surface=>$new);
