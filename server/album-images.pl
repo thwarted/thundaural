@@ -1,0 +1,302 @@
+#!/usr/bin/perl
+
+# $Header: /home/cvs/thundaural/server/album-images.pl,v 1.2 2004/07/16 06:00:14 jukebox Exp $
+
+use strict;
+use warnings;
+
+use Getopt::Long qw(:config pass_through);
+use Data::Dumper;
+use File::Basename;
+use Thundaural::Server::Settings;
+
+use Thundaural::Logger qw(logger);
+use Thundaural::Server::DatabaseSetup;
+
+use DBI;
+
+my $storagedir = Thundaural::Server::Settings::storagedir();
+Thundaural::Logger::init('stderr');
+
+my $dbh;
+{ # set up the database
+    my $dbfile = Thundaural::Server::Settings::dbfile();
+    $dbh = DBI->connect("dbi:SQLite:dbname=$dbfile","","", {PrintError=>0, RaiseError=>0});
+}
+
+my $albumid = undef;
+my $label = 'front cover';
+my $preference = 1;
+my $filename = undef;
+my $show_only_needed = 0;
+my $list_albums = 0;
+my $show_album = 0;
+{ # figure out what we want to do
+    my %options = (
+                'more-help'=>\&usage,
+                'only-needed'=>\$show_only_needed,
+                'list-albums'=>\$list_albums,
+                'show-album'=>\$show_album,
+                'file=s'=>\$filename,
+                'preference=i'=>\$preference,
+                'albumid=i'=>\$albumid,
+                'delete=i'=>\&delete_image,
+                'label=s'=>\$label
+   );
+   exit unless GetOptions(%options);
+}
+
+if ($albumid && $filename) {
+    &set_album_image();
+    exit;
+}
+
+if ($albumid) {
+    &show_album;
+    exit;
+}
+&list_albums;
+exit;
+
+sub usage {
+    print <<"EOF";
+$0 [options] ...
+Takes all the standard config file arguments (--help for details).
+Reads the server configuration file before command line options.
+
+  --more-help       this help message
+  --albumid <i>     focus on albumid <i>
+  --list-albums     list all albums in the database
+  --show-album      print info on the focused album
+  --only-needed     use with --list-albums to only show albums with
+                    no images at all
+
+To set an image for an album, at least the --file option must be
+be specified, in addition to --albumid.
+  --file <f>        filename containing the image
+  --preference <i>  numbered preference image (default 1)
+  --label <l>       label for the image (default 'front cover')
+
+  --delete <i>      delete image(s) with a preference of <i>
+                    the iamge file is not deleted, it is only 
+                    removed from the database
+
+You may need to quote the label. Note that not all Thundaural
+clients support more than one image (all should use the lowest
+numbered preference by default though).  Also, giving multiple
+images the same preference, while allowed, may cause strange,
+unreliable results, and you'll be unable to remove just one with
+the --delete option.
+
+The default action when not options are specified is --list-albums.
+If --albumid is specified, the default is --show-album.
+
+Files should be JPEG files, under about 60k in compressed byte
+size.  The larger the pixel dimensions of the image, the better
+it will look, of course.
+
+Examples:
+
+List all albums:
+    $0 --list-albums
+    $0
+    $0 --list-albums --only-needed
+
+Get detailed info on an album:
+    $0 --albumid 6 --show-album
+    $0 --albumid 6
+
+Set an image for the back cover for album 6, with the front cover
+already defined as preference 1:
+    $0 --albumid 6 --file newart.jpg --preference 2 --label 'back cover'
+
+Delete all images with preference 2 (hopefully, only the one we just
+added):
+    $0 --albumid 6 --delete 2
+EOF
+    exit;
+}
+
+sub list_albums {
+    my $q = "select p.*, a.*, p.name as performername, count(i.albumid) as images
+            from albums a left join albumimages i on a.albumid = i.albumid, performers p
+            where a.performerid = p.performerid
+            group by i.albumid
+            order by p.sortname, a.albumid";
+    my $sth = $dbh->prepare($q);
+    $sth->execute();
+
+    my($r, $name, $pname);
+format AL_TOP =
+
+@>>> @<<<<<<<<<<<<<<<<<<<<<<<<<<<   @<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< @<<<<<
+qw(ID Performer AlbumName Images)
+------------------------------------------------------------------------------
+.
+format AL =
+@>>> ^<<<<<<<<<<<<<<<<<<<<<<<<<<<   ^<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< @>>>>
+$r->{albumid}, $pname, $name, $r->{images}
+~     ^<<<<<<<<<<<<<<<<<<<<<<<<<<    ^<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+     $pname,                        $name
+.
+    $- = 0;
+    $~ = 'AL';
+    $^ = 'AL_TOP';
+    $= = 25;
+    while($r = $sth->fetchrow_hashref()) {
+        $name = $r->{name};
+        $pname = $r->{performername};
+        $r->{images} += 0;
+        next if ($show_only_needed && $r->{images});
+        write;
+    }
+    $sth->finish;
+}
+
+sub show_album {
+    my $q = "select p.*, a.*, p.name as performername 
+             from albums a, performers p 
+             where a.performerid = p.performerid and a.albumid = ? 
+             limit 1";
+    my $sth = $dbh->prepare($q);
+    $sth->execute($albumid);
+    my $a = $sth->fetchrow_hashref();
+    $sth->finish;
+
+    if (keys %$a) {
+        my $len = sprintf('%d:%02d', $a->{length} / 60, $a->{length} % 60);
+        my $cddbid = $a->{cddbid} || '[unknown]';
+        my $cdindexid = $a->{cdindexid} || '[unknown]';
+        print <<"EOF";
+Album ID : $a->{albumid}
+Name     : $a->{name}
+Performer: $a->{performername} ($a->{sortname})
+Source   : $a->{source} (cddb $cddbid, cdindex $cdindexid)
+Tracks   : $a->{tracks}
+Length   : $len
+EOF
+
+        $q = "select * from albumimages where albumid = ? order by preference";
+        $sth = $dbh->prepare($q);
+        $sth->execute($a->{albumid});
+        print "\n";
+        my $if = 0;
+        while(my $i = $sth->fetchrow_hashref()) {
+            printf('%2d: %s%s%s%s', $i->{preference}, $i->{label}, "\n\t", $i->{filename}, "\n");
+            $if++;
+        }
+        $sth->finish;
+        if (!$if) {
+            print "This album has not been assigned any images.\n";
+        }
+    } else {
+        print "Album $albumid not found\n";
+    }
+}
+
+sub get_sort_dir {
+    my $a = shift;
+
+    $a =~ s/^\s+//;
+    $a =~ s/^(An?\W|The\W|\W+)//i;
+    ($a) = $a =~ m/^(\w)/;
+    $a = lc $a; 
+    $a = 'x' if (!$a);
+    return $a;
+}
+
+sub coverartfilename {
+    my $album = shift;
+    my $label = shift;
+
+    my $cadir = sprintf('coverart/%s', &get_sort_dir($album->{performersort}));
+    mkdir(sprintf('%s/coverart', $storagedir), 0777);
+    mkdir(sprintf('%s/%s', $storagedir, $cadir), 0777);
+    my $coverartfile = sprintf('%s/%s - %s - %s - %s.jpg',
+                    $cadir,
+                    $album->{performername},
+                    $album->{name},
+                    $album->{cddbid},
+                    $label
+                );
+    return $coverartfile;
+}
+
+sub delete_image {
+    my %o = @_;
+    my $delete_pref = $o{delete};
+    if (!$albumid || !$delete_pref) {
+        die("Usage: $0--albumid <id#> --delete <preference#>\n");
+    }
+    my $q = "select filename from albumimages where albumid = ? and preference = ?";
+    my $sth = $dbh->prepare($q);
+    $sth->execute($albumid, $delete_pref);
+    my @foundfiles = ();
+    while(my($f) = $sth->fetchrow_array()) {
+        push(@foundfiles, $f);
+    }
+    $sth->finish;
+
+    $q = "delete from albumimages where albumid = ? and preference = ?";
+    my $rows_deleted = $dbh->do($q, undef, $albumid, $delete_pref);
+    $rows_deleted += 0;
+    print "$rows_deleted album images deleted\n";
+    if ($rows_deleted) {
+        print "The following files can be deleted from $storagedir:\n\t";
+        print join("\n\t", @foundfiles);
+        print "\n";
+    }
+    exit;
+}
+
+sub set_album_image {
+    die("$0: $filename does not exist\n") if (! -e $filename);
+    die("$0: $filename is not a plain file\n") if (! -f $filename);
+    die("$0: $filename is empty\n") if (! -s $filename);
+
+    # get album data
+    my $q = "select p.*, a.*, p.name as performername, p.sortname as performersort
+             from albums a, performers p 
+             where a.performerid = p.performerid and a.albumid = ? 
+             limit 1";
+    my $sth = $dbh->prepare($q);
+    $sth->execute($albumid);
+    my $album = $sth->fetchrow_hashref();
+    $sth->finish;
+
+    # set up default arguments
+    if (!$label) {
+        $label = "front cover";
+    }
+    if (!$preference) {
+        $q = "select max(preference) from albumimages where albumid = ?";
+        $sth = $dbh->prepare($q);
+        $sth->execute($albumid);
+        ($preference) = $sth->fetchrow_array();
+        $sth->finish;
+        $preference++;
+    }
+
+    my $coverartfile;
+    my $extra = -$preference;
+    do {
+        $coverartfile = &coverartfilename($album, sprintf('%s%s', $label, $extra));
+        $extra--;
+    } while(-s "$storagedir/$coverartfile");
+
+    open(I, "<$filename") || die("$0: unable to read from $filename: $!\n");
+    open(F, ">$storagedir/$coverartfile") || die("$0: unable to write to $coverartfile: $!\n");
+    my $buf = '';
+    while(read(I, $buf, 4096)) {
+        print F $buf;
+    }
+    close(F);
+    close(I);
+
+    $q = "insert into albumimages (albumid, label, preference, filename) values (?, ?, ?, ?)";
+    my $newrows = $dbh->do($q, undef, $albumid, $label, $preference, $coverartfile);
+    print "$newrows album image added.\n";
+    exit;
+}
+
+
