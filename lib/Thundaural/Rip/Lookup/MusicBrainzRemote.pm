@@ -13,10 +13,9 @@ use Thundaural::Util;
 
 sub new {
 	my $proto = shift;
-        my %o = @_;
-                                                                                                                                                                                 
-        my $class = ref($proto) || $proto;
+	my %o = @_;
 
+	my $class = ref($proto) || $proto;
 	my $this = {};
 	bless $this, $class;
 	$this->{storagedir} = $o{storagedir} || '/tmp';
@@ -49,7 +48,7 @@ sub lookup {
 	my $tree = XML::Ximple::parse_xml($xml);
 
 	$this->{albuminfo} = {
-                'creator'=>undef,
+		'creator'=>undef,
 		'artist'=>undef,
 		'gid'=>undef,
 		'tracks'=>[],
