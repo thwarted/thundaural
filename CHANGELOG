@@ -1,3 +1,13 @@
+changes to version 1.6
+
+- 'devices' command was including private entries (those that had a type
+  that began with an underscore)
+
+- fixed up database creation/upgrade code to work with SQLite3
+  don't create functions while in a transaction
+  ->prepare now fails on critical errors that used to happen in ->execute
+  
+
 changes from version 1.5.1 to version 1.6
 
 - added copyright notices to files, included GPL in the file COPYING
