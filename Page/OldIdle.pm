@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-# $Header: /home/cvs/thundaural/client/Page/OldIdle.pm,v 1.1 2003/12/27 10:47:22 jukebox Exp $
+# $Header: /home/cvs/thundaural/client/Page/OldIdle.pm,v 1.2 2004/01/04 04:57:19 jukebox Exp $
 
 package Page::OldIdle;
 
@@ -68,8 +68,6 @@ sub new {
 	$this->{-albums} = $o{-albums}; # new Albums(-server=>$this->{-server});
 	die("passed argument for -albums not an Album object") if (!ref($this->{-albums}) && !$this->{-albums}->isa('Albums'));
 
-	$this->{-layout} = new Layout(-server=>$this->{-server});
-
 	$this->{-storagedir} = '/home/storage';
 
 	$this->{-imgsurfaces}->{button_play_depressed} = new SDL::Surface(-name=>"./images/button-play-depressed.png");
@@ -103,7 +101,7 @@ sub _make() {
 	$updater->on_event($main::E_UPDATESTATUS, sub { if($this->{-appstate}->{current_page} eq 'idle') { $this->update(); } } );
 	$this->add_widget('000-updater', $updater);
 
-	my $outputs = $this->{-layout}->outputs;
+	my $outputs = $this->{-server}->devices('play');
 	foreach my $channel (@$outputs) {
 		# note that the skip button's name is sorted near the end (99-)
 		# and that its position is relative to $app, even though we are
@@ -201,7 +199,7 @@ sub update() {
 	my $textupdated = 0;
 
 	my $np = $this->{-server}->playing_on();
-	my $outputs = $this->{-layout}->outputs();
+	my $outputs = $this->{-server}->devices('play');
 
 	my $x = $this->{-drawsrc};
 	$x->fill(0, $bgcolor);

@@ -167,15 +167,16 @@ sub _adjust_albumoffset($) {
 		$this->{-lastalbumoffset} = $this->{-albumoffset};
 		$this->{-albumoffset} += $amount;
 	}
-	$this->widget('99-slider')->pctfull($this->{-albumoffset} / $count);
 
 	if ($this->{-albumoffset} > $max) {
 		$this->{-albumoffset} = $max;
-		$this->widget('99-slider')->pctfull(100);
-	}
-	if ($this->{-albumoffset} < 0) {
-		$this->{-albumoffset} = 0;
 		$this->widget('99-slider')->pctfull(1);
+	} elsif ($this->{-albumoffset} < 0) {
+		$this->{-albumoffset} = 0;
+		$this->widget('99-slider')->pctfull(0);
+	} else {
+		my $pc = $this->{-albumoffset} / $count;
+		$this->widget('99-slider')->pctfull($pc);
 	}
 }
 

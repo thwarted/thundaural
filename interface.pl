@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-# $Header: /home/cvs/thundaural/client/interface.pl,v 1.3 2003/12/30 07:00:25 jukebox Exp $
+# $Header: /home/cvs/thundaural/client/interface.pl,v 1.7 2004/01/08 08:20:46 jukebox Exp $
 
 use strict;
 use warnings;
@@ -32,7 +32,8 @@ my $usesize = 15;
 
 my $WIN_X = 1024;
 my $WIN_Y = 768;
-my $idle_topline = 110;
+
+my $debug_timers = 0;
 
 use DBI;
 
@@ -55,7 +56,6 @@ use Track;
 use Albums;
 use Album;
 use Status;
-use Layout;
 
 # interface related stuff
 use EventReceiver;
@@ -111,7 +111,7 @@ $Albums = new Albums(-server=>$iCon);
 
 $pages->{'albums'} = new Page::Albums(-server=>$iCon, -canvas=>$app, -rect=>$pagearea, -appstate=>$state, -albums=>$Albums);
 $pages->{'tracks'} = new Page::Tracks(-server=>$iCon, -canvas=>$app, -rect=>$pagearea, -appstate=>$state, -albums=>$Albums);
-$pages->{'oldidle'} = new Page::OldIdle(-server=>$iCon, -canvas=>$app, -rect=>$pagearea, -appstate=>$state, -albums=>$Albums);
+#$pages->{'oldidle'} = new Page::OldIdle(-server=>$iCon, -canvas=>$app, -rect=>$pagearea, -appstate=>$state, -albums=>$Albums);
 $pages->{'ripping'} = new Page::Ripping(-server=>$iCon, -canvas=>$app, -rect=>$pagearea, -appstate=>$state, -albums=>$Albums);
 $pages->{'idle'} = new Page::NowPlaying(-server=>$iCon, -canvas=>$app, -rect=>$pagearea, -appstate=>$state, -albums=>$Albums);
 
@@ -130,41 +130,25 @@ $pages->{'idle'} = new Page::NowPlaying(-server=>$iCon, -canvas=>$app, -rect=>$p
         $imgsurfaces->{'nowplaying-4'} = new SDL::Surface(-name=>'./images/nowplaying-speaker4.png');
         $imgsurfaces->{'nowplaying-5'} = new SDL::Surface(-name=>'./images/nowplaying-speaker5.png');
         $imgsurfaces->{'nowplaying-6'} = new SDL::Surface(-name=>'./images/nowplaying-speaker6.png');
-             $imgsurfaces->{volumemin} = new SDL::Surface(-name=>'./images/volume-min.png');
-             $imgsurfaces->{volumemax} = new SDL::Surface(-name=>'./images/volume-max.png');
 
 my $callfuncs = [];
 
 my $menuwidgets = &make_menu_widgets;
-&draw_widgets;
-
-#$state->{idleredrawtimer} = new SDL::Timer( sub { &changepage('idle') if ($state->{current_page} eq 'idle'); return 2*1000; }, -delay=>2*1000);
-#$state->{idleredrawtimer} = new SDL::Timer( sub { $pages->{$state->{current_page}}->update() if ($state->{current_page} eq 'idle' && ref($pages->{$state->{current_page}})); return 350; }, -delay=>350);
-$state->{idleredrawtimer} = new SDL::Timer( sub { 
-		if (($state->{current_page} eq 'idle' || 
-		     $state->{current_page} eq 'ripping' ||
-		     $state->{current_page} eq 'oldidle')
-		    && ref($pages->{$state->{current_page}}))  {
-			my $e = new SDL::Event;
-			$e->settype($E_UPDATESTATUS);
-			$e->push();
-		}
-		return 750;
-	}, -delay=>750);
-$state->{animatetimer} = new SDL::Timer( sub {
-		my $e = new SDL::Event;
-		$e->settype($E_ANIMATE);
-		$e->push();
-		return 450; 
-	}, -delay=>450);
-
-&mainloop;
+#&draw_widgets;
 
 my $totalevents = 0;
+my $ticks = {};
+$ticks->{animate_delay} = 450;
+$ticks->{update_delay} = 500;
+$ticks->{animate} = 0;
+$ticks->{update} = 0;
+
+&mainloop;
 
 sub mainloop {
 	my $loops;
 	my $event = new SDL::Event;             # create a new event
+	EVENTLOOP:
 	while(1) {
 		if ($state->{last_page} ne $state->{current_page}) {
 			$pages->{$state->{current_page}}->now_viewing(); # notify the page it's being viewed
@@ -173,7 +157,26 @@ sub mainloop {
 			$state->{last_page} = $state->{current_page};
 		}
 
-		$event->wait();
+		# note our tricky implementation here.  If, after a pause, we don't see any events
+		# then push an event.   On the next iteration, the condition will be false and we'll
+		# exit the loop
+		while (!$event->poll()) {
+			my $now = $app->ticks();
+			if (($now - $ticks->{animate}) > $ticks->{animate_delay}) {
+				my $e = new SDL::Event;
+				$e->settype($E_UPDATESTATUS);
+				$e->push();
+				$ticks->{animate} = $now;
+			}
+			if (($now - $ticks->{update}) > $ticks->{update_delay}) {
+				my $e = new SDL::Event;
+				$e->settype($E_ANIMATE);
+				$e->push();
+				$ticks->{update} = $now;
+			}
+			$app->delay(50);
+		}
+		$totalevents++;
 		my $type = $event->type();      # get event type
 
 		if ($type == SDL::SDL_QUIT) { Logger::logger("request quit"); last; }
@@ -190,19 +193,33 @@ sub mainloop {
 				my $sub = shift @$callfuncs;
 				&$sub;
 			}
-			Logger::logger("called $funccount subs");
+			Logger::logger("E_CALLFUNCS: called $funccount subs");
 			next;
 		}
 
+		if ($debug_timers) {
+			if ($type == $E_UPDATESTATUS) {
+				Logger::logger("E_UPDATESTATUS event received");
+			}
+
+			if ($type == $E_ANIMATE) {
+				Logger::logger("E_ANIMATE event received");
+			}
+		}
+
+		my $lastpage = $state->{current_page};
 		foreach my $o (values %{$menuwidgets}) {
 			$o->receive($event);
+			if ($lastpage ne $state->{current_page}) {
+				Logger::logger("current_page changed due to event");
+				next EVENTLOOP;
+			}
 		}
 
 		if (eval { $pages->{$state->{current_page}}->isa('Page'); } ) {
 			$pages->{$state->{current_page}}->receive($event, $app->ticks());
 		}
 
-		$totalevents++;
 	}
 }
 
@@ -310,18 +327,18 @@ sub make_menu_widgets {
 				} );
 		$gotoidle->on_interior_event(SDL::SDL_MOUSEBUTTONDOWN, sub { $state->{current_page} = 'idle'; } );
 	}
-	my $ni = new Button(
-			-name=>"oldidle",
-			-canvas=>$app,
-			-bg=>$bgcolor,
-			-mask=>new SDL::Rect(-width=>90, -height=>90, -x=>270, -y=>1)
-		);
-	{
-		$ni->predraw( sub { &main::draw_background($ni->mask(), $app); } );
-		$ni->surface(2, $imgsurfaces->{'nowplaying-2'});
-		$ni->frame(2);
-		$ni->on_interior_event(SDL::SDL_MOUSEBUTTONDOWN, sub { $state->{current_page} = 'oldidle'; } );
-	}
+#	my $ni = new Button(
+#			-name=>"oldidle",
+#			-canvas=>$app,
+#			-bg=>$bgcolor,
+#			-mask=>new SDL::Rect(-width=>90, -height=>90, -x=>270, -y=>1)
+#		);
+#	{
+#		$ni->predraw( sub { &main::draw_background($ni->mask(), $app); } );
+#		$ni->surface(2, $imgsurfaces->{'nowplaying-2'});
+#		$ni->frame(2);
+#		$ni->on_interior_event(SDL::SDL_MOUSEBUTTONDOWN, sub { $state->{current_page} = 'oldidle'; } );
+#	}
 	my $gotoalbums = new Button(
                 	-name=>'gotoalbums',
                 	-canvas=>$app,
@@ -367,7 +384,7 @@ sub make_menu_widgets {
 	}
 
 	return {'00-screensaver'=>$screensaver,
-		'00-ni'=>$ni,
+		#'00-ni'=>$ni,
 		'00-gotoalbums'=>$gotoalbums,
 		'00-gotoripping'=>$gotoripping,
 		'00-gotoidle'=>$gotoidle};
@@ -571,4 +588,28 @@ __END__
 #		$speaker->on_interior_event(SDL_MOUSEBUTTONDOWN, sub { print "Pressed speaker\n"; } );
 #	}
 #	$pages->{idle}->{'00-speaker'} = $speaker;
+
+# SDL::Timer doesn't seem very stable
+#$state->{idleredrawtimer} = new SDL::Timer( sub { &changepage('idle') if ($state->{current_page} eq 'idle'); return 2*1000; }, -delay=>2*1000);
+#$state->{idleredrawtimer} = new SDL::Timer( sub { $pages->{$state->{current_page}}->update() if ($state->{current_page} eq 'idle' && ref($pages->{$state->{current_page}})); return 350; }, -delay=>350);
+#
+#$state->{idleredrawtimer} = new SDL::Timer( sub { 
+#		Logger::logger("idleredrawtimer timer running at ".$app->ticks()) if ($debug_timers);
+#		if (($state->{current_page} eq 'idle' || 
+#		     $state->{current_page} eq 'ripping' ||
+#		     $state->{current_page} eq 'oldidle')
+#		    && ref($pages->{$state->{current_page}}))  {
+#			my $e = new SDL::Event;
+#			$e->settype($E_UPDATESTATUS);
+#			$e->push();
+#		}
+#		return 750;
+#	}, -delay=>750);
+#$state->{animatetimer} = new SDL::Timer( sub {
+#		Logger::logger("animate timer running at ".$app->ticks()) if ($debug_timers);
+#		my $e = new SDL::Event;
+#		$e->settype($E_ANIMATE);
+#		$e->push();
+#		return 450; 
+#	}, -delay=>450);
 

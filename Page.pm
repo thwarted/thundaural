@@ -95,6 +95,7 @@ sub receive {
         $this->{-lastevent} = $event->type();
 
 	my @widgets = $this->widgets();
+	my $lastpage = $this->{-appstate}->{current_page};
 	foreach my $wk (@widgets) {
 		# the widgets themselves could edit the object's widget list 
 		# so check to make sure the widget exists and catch any errors
@@ -103,6 +104,10 @@ sub receive {
 				$this->{-widgets}->{$wk}->receive(@_);
 			};
 			warn($@) if ($@);
+			if ($lastpage ne $this->{-appstate}->{current_page}) {
+				Logger::logger("sending events to widgets caused page change");
+				last;
+			}
 		}
 	}
 }
