@@ -26,9 +26,9 @@ sub widget_initialize {
     my $area = new SDL::Rect(-width=>90, -height=>90, -x=>160, -y=>2);
     $this->area($area);
 
-    $this->add_frame(file=>'images/goto-albums.png', resize=>1);
+    $this->add_frame(file=>'media/images/goto-albums.png', resize=>1);
     #$this->make_depressed_frame();
-    #$this->add_depressed_frame(file=>'images/volume-max.png', resize=>1);
+    #$this->add_depressed_frame(file=>'media/images/volume-max.png', resize=>1);
 
     $this->SUPER::widget_initialize();
 }

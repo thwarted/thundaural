@@ -29,9 +29,9 @@ use Themes::Original::RipperPage;
 sub theme_initialize {
     my $this = shift;
 
-    #$this->bgimage(new SDL::Surface(-name=>'images/1024x768-Appropriately-Left-Handed-1.png'));
-    #$this->bgimage(new SDL::Surface(-name=>'images/fractalbroccoli.jpg'));
-    $this->bgimage(new SDL::Surface(-name=>'images/bgmetal2.png'));
+    #$this->bgimage(new SDL::Surface(-name=>'media/images/1024x768-Appropriately-Left-Handed-1.png'));
+    #$this->bgimage(new SDL::Surface(-name=>'media/images/fractalbroccoli.jpg'));
+    $this->bgimage(new SDL::Surface(-name=>'media/images/bgmetal2.png'));
     #$this->bgcolor(new SDL::Color(-r=>160, -g=>160, -b=>160));
 
     $this->add_widget(new Themes::Original::AlbumsIcon(name=>'IconAlbums'));

@@ -1,6 +1,10 @@
 #!/usr/bin/perl
 
-# $Header: /home/cvs/thundaural/server/server.pl,v 1.27 2004/06/10 05:56:44 jukebox Exp $
+BEGIN {
+    if(my($dir) = $0 =~ m/^(.+)\/[^\/]+$/) {
+        eval "use lib \"$dir/lib\"";
+    }
+}
 
 use strict;
 use warnings;

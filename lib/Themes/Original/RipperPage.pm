@@ -41,7 +41,7 @@ sub widget_initialize {
     my $halfbg = new SDL::Color(-r=>160, -g=>160, -b=>160);
     my $fgcolor = new SDL::Color(-r=>180, -g=>180, -b=>180);
     my $labelcolor = new SDL::Color(-r=>0, -g=>0, -b=>0);
-    my $f = new SDL::TTFont(-name=>"./fonts/Vera.ttf", -size=>14, -bg=>$halfbg, -fg=>$labelcolor);
+    my $f = new SDL::TTFont(-name=>"media/fonts/Vera.ttf", -size=>14, -bg=>$halfbg, -fg=>$labelcolor);
 
     my $rparea = new SDL::Rect(-width=>600, -height=>16, -x=>10+300+10, -y=>105);
     my $rp = new Widget::ProgressBar(name=>'ripprogress', area=>$rparea, bgcolor=>$bgcolor, fgcolor=>$fgcolor, font=>$f);

@@ -19,7 +19,7 @@ sub widget_initialize {
     $this->bgcolor(new SDL::Color(-r=>140, -g=>140, -b=>140));
     $this->fgcolor(new SDL::Color(-r=>0x4b, -g=>0x2e, -b=>0x82));
     $this->orientation('h');
-    $this->font('./fonts/Vera.ttf');
+    $this->font('media/fonts/Vera.ttf');
     $this->type('line');
     $this->{minsize} = int($area->width() / 100);
 

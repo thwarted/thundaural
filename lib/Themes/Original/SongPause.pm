@@ -26,11 +26,11 @@ sub widget_initialize {
     my $area = new SDL::Rect(-width=>72, -height=>72, -x=>80, -y=>450);
     $this->area($area);
 
-    $this->add_frame(file=>'images/button-pause-raised.png', resize=>0);
-    $this->add_depressed_frame(file=>'images/button-pause-depressed.png', resize=>0);
+    $this->add_frame(file=>'media/images/button-pause-raised.png', resize=>0);
+    $this->add_depressed_frame(file=>'media/images/button-pause-depressed.png', resize=>0);
 
-    $this->add_frame(file=>'images/button-play-raised.png', resize=>0);
-    $this->add_depressed_frame(file=>'images/button-play-depressed.png', resize=>0);
+    $this->add_frame(file=>'media/images/button-play-raised.png', resize=>0);
+    $this->add_depressed_frame(file=>'media/images/button-play-depressed.png', resize=>0);
 
     $this->SUPER::widget_initialize();
 }

@@ -31,7 +31,7 @@ sub widget_initialize {
     $this->{face} = new SDL::Surface(-width=>$area->width(), -height=>$area->height(), -depth=>32);
     $this->{face}->fill(0, $this->{bgcolor});
 
-    my $font = new SDL::TTFont(-name=>"./fonts/Vera.ttf", -size=>20, -bg=>$this->{bgcolor}, -fg=>$this->{fgcolor});
+    my $font = new SDL::TTFont(-name=>"media/fonts/Vera.ttf", -size=>20, -bg=>$this->{bgcolor}, -fg=>$this->{fgcolor});
     $this->{duration} = $o{duration};
     $this->{device} = $o{device};
 

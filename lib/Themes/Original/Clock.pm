@@ -35,7 +35,7 @@ sub widget_initialize {
 
     my $fontsize;
     $fontsize = $show_seconds ? 40 : 49;
-    $this->{font} = new SDL::TTFont(-name=>"./fonts/Vera.ttf", -size=>$fontsize, -bg=>$this->{bgcolor}, -fg=>$this->{fgcolor});
+    $this->{font} = new SDL::TTFont(-name=>"media/fonts/Vera.ttf", -size=>$fontsize, -bg=>$this->{bgcolor}, -fg=>$this->{fgcolor});
     $this->{surface} = new SDL::Surface(-width=>$area->width(), -height=>$area->height(), -depth=>32);
     $this->surface($this->{surface});
 

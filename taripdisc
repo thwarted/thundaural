@@ -1,9 +1,8 @@
 #!/usr/bin/perl
 
 BEGIN {
-    my($dir) = $0 =~ m/^(.+)\/[^\/]+$/;
-    if ($dir) {
-        eval "use lib \"$dir\"";
+    if(my($dir) = $0 =~ m/^(.+)\/[^\/]+$/) {
+        eval "use lib \"$dir/lib\"";
     }
 }
 

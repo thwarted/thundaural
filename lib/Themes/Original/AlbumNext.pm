@@ -16,8 +16,8 @@ sub widget_initialize {
     my $area = new SDL::Rect(-x=>877, -y=>668, -width=>95, -height=>95);
     $this->area($area);
 
-    $this->set_frame(file=>'images/button-next-raised.gif', frame=>0);
-    $this->set_depressed_frame(file=>'images/button-next-depressed.gif', frame=>0);
+    $this->set_frame(file=>'media/images/button-next-raised.gif', frame=>0);
+    $this->set_depressed_frame(file=>'media/images/button-next-depressed.gif', frame=>0);
 
     $this->bgcolor(new SDL::Color(-r=>160, -g=>160, -b=>160));
 

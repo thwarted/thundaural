@@ -26,10 +26,10 @@ sub widget_initialize {
     my $area = new SDL::Rect(-width=>90, -height=>90, -x=>820, -y=>2);
     $this->area($area);
 
-    $this->add_frame(file=>'images/ripcdrom-idle.png', resize=>1);
-    $this->add_frame(file=>'images/ripcdrom-busy.png', resize=>1);
-    $this->add_depressed_frame(file=>'images/ripcdrom-idle.png', resize=>1);
-    $this->add_depressed_frame(file=>'images/ripcdrom-busy.png', resize=>1);
+    $this->add_frame(file=>'media/images/ripcdrom-idle.png', resize=>1);
+    $this->add_frame(file=>'media/images/ripcdrom-busy.png', resize=>1);
+    $this->add_depressed_frame(file=>'media/images/ripcdrom-idle.png', resize=>1);
+    $this->add_depressed_frame(file=>'media/images/ripcdrom-busy.png', resize=>1);
 
     $this->SUPER::widget_initialize();
 }

@@ -33,7 +33,7 @@ sub widget_initialize {
     my $s = new SDL::Surface(-width=>$area->width(), -height=>$area->height(), -depth=>32);
     $this->surface($s);
 
-    $this->{font} = new SDL::TTFont(-name=>"./fonts/Vera.ttf", -size=>20, -bg=>$this->{bgcolor}, -fg=>$this->{fgcolor});
+    $this->{font} = new SDL::TTFont(-name=>"media/fonts/Vera.ttf", -size=>20, -bg=>$this->{bgcolor}, -fg=>$this->{fgcolor});
 
     $this->{lastupdate} = 0;
     $this->{lastlines} = '';

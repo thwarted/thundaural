@@ -26,8 +26,8 @@ sub widget_initialize {
     my $area = new SDL::Rect(-width=>72, -height=>72, -x=>80, -y=>450+100);
     $this->area($area);
 
-    $this->set_frame(file=>'images/button-skip-raised.png', resize=>0);
-    $this->set_depressed_frame(file=>'images/button-skip-depressed.png', resize=>0);
+    $this->set_frame(file=>'media/images/button-skip-raised.png', resize=>0);
+    $this->set_depressed_frame(file=>'media/images/button-skip-depressed.png', resize=>0);
 
     $this->SUPER::widget_initialize();
 }

@@ -31,9 +31,9 @@ sub widget_initialize {
 
     $this->{bgcolor} = new SDL::Color(-r=>170, -b=>170, -g=>170);
     $this->{fgcolor} = new SDL::Color(-r=>0, -b=>0, -g=>0);
-    $this->{fontsmall} = new SDL::TTFont(-name=>"./fonts/Vera.ttf", -size=>15, -bg=>$this->{bgcolor}, -fg=>$this->{fgcolor});
-    $this->{font} = new SDL::TTFont(-name=>"./fonts/Vera.ttf", -size=>20, -bg=>$this->{bgcolor}, -fg=>$this->{fgcolor});
-    $this->{fontbig} = new SDL::TTFont(-name=>"./fonts/Vera.ttf", -size=>34, -bg=>$this->{bgcolor}, -fg=>$this->{fgcolor});
+    $this->{fontsmall} = new SDL::TTFont(-name=>"media/fonts/Vera.ttf", -size=>15, -bg=>$this->{bgcolor}, -fg=>$this->{fgcolor});
+    $this->{font} = new SDL::TTFont(-name=>"media/fonts/Vera.ttf", -size=>20, -bg=>$this->{bgcolor}, -fg=>$this->{fgcolor});
+    $this->{fontbig} = new SDL::TTFont(-name=>"media/fonts/Vera.ttf", -size=>34, -bg=>$this->{bgcolor}, -fg=>$this->{fgcolor});
 
     $this->{namestart} = 2 + $this->{fontbig}->width('88')+10;
     $this->{infowidth} = $this->{font}->width('never played');

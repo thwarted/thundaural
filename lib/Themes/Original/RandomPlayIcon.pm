@@ -26,8 +26,8 @@ sub widget_initialize {
     my $area = new SDL::Rect(-width=>90, -height=>90, -x=>300, -y=>2);
     $this->area($area);
 
-    $this->set_frame(file=>'images/randomize.png', resize=>1, frame=>0);
-    #$this->set_depressed_frame(file=>'images/button-back-raised.gif', resize=>1, frame=>0);
+    $this->set_frame(file=>'media/images/randomize.png', resize=>1, frame=>0);
+    #$this->set_depressed_frame(file=>'media/images/button-back-raised.gif', resize=>1, frame=>0);
 
     $this->SUPER::widget_initialize();
 }

@@ -32,7 +32,7 @@ sub widget_initialize {
     my $halfbg = new SDL::Color(-r=>160, -g=>160, -b=>160);
     my $fgcolor = new SDL::Color(-r=>180, -g=>180, -b=>180);
     my $labelcolor = new SDL::Color(-r=>0, -g=>0, -b=>0);
-    my $f = new SDL::TTFont(-name=>"./fonts/Vera.ttf", -size=>14, -bg=>$halfbg, -fg=>$labelcolor);
+    my $f = new SDL::TTFont(-name=>"media/fonts/Vera.ttf", -size=>14, -bg=>$halfbg, -fg=>$labelcolor);
 
     my $acarea = new SDL::Rect(-x=>10, -y=>105, -height=>300, -width=>300);
     $this->add_widget(new Themes::Original::AlbumCover(name=>'AlbumCover', area=>$acarea));
@@ -64,7 +64,7 @@ sub widget_initialize {
     foreach my $iconlabel (keys %vicons) {
         my $r = new SDL::Rect(-width=>22, -height=>21, -x=>20, -y=>$vicons{$iconlabel});
         my $i = new Widget::Button(name=>"volume-icon-$iconlabel", area=>$r);
-        $i->add_frame(file=>"images/volume-speaker-$iconlabel.png", resize=>0);
+        $i->add_frame(file=>"media/images/volume-speaker-$iconlabel.png", resize=>0);
         $this->add_widget($i);
     }
 }

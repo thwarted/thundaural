@@ -28,7 +28,7 @@ sub widget_initialize {
 
     $this->{bgcolor} = new SDL::Color(-r=>110, -g=>110, -b=>110);
     $this->{fgcolor} = new SDL::Color(-r=>255, -g=>255, -b=>255);
-    $this->{font} = new SDL::TTFont(-name=>"./fonts/Vera.ttf", -size=>20, -bg=>$this->{bgcolor}, -fg=>$this->{fgcolor});
+    $this->{font} = new SDL::TTFont(-name=>"media/fonts/Vera.ttf", -size=>20, -bg=>$this->{bgcolor}, -fg=>$this->{fgcolor});
 
     $this->{blank} = new SDL::Surface(-width=>$area->width(), -height=>$area->height(), -depth=>24);;
     $this->{blank}->display_format();

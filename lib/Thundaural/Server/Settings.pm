@@ -13,7 +13,8 @@ use Thundaural::Server::SettingsSetup qw($_devices $_defaultplaydevice $_progs $
 if (!defined($_defaultplaydevice) 
  || ref($_devices->{$_defaultplaydevice}) ne 'HASH' 
  || !($_devices->{$_defaultplaydevice}->{_order}) ) {
-	die("$0: no default device defined, some error has occured\n");
+	warn("$0: no default device defined, some error has occured\n");
+    exit;
 }
 
 sub createdb {

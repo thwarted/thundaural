@@ -26,21 +26,21 @@ sub widget_initialize {
     my $area = new SDL::Rect(-width=>90, -height=>90, -x=>5, -y=>2);
     $this->area($area);
 
-    $this->set_frame(file=>'images/nowplaying-speaker0.png', resize=>1, frame=>0);
-    $this->set_frame(file=>'images/nowplaying-speaker1.png', resize=>1, frame=>1);
-    $this->set_frame(file=>'images/nowplaying-speaker2.png', resize=>1, frame=>2);
-    $this->set_frame(file=>'images/nowplaying-speaker3.png', resize=>1, frame=>3);
-    $this->set_frame(file=>'images/nowplaying-speaker4.png', resize=>1, frame=>4);
-    $this->set_frame(file=>'images/nowplaying-speaker5.png', resize=>1, frame=>5);
-    $this->set_frame(file=>'images/nowplaying-speaker6.png', resize=>1, frame=>6);
+    $this->set_frame(file=>'media/images/nowplaying-speaker0.png', resize=>1, frame=>0);
+    $this->set_frame(file=>'media/images/nowplaying-speaker1.png', resize=>1, frame=>1);
+    $this->set_frame(file=>'media/images/nowplaying-speaker2.png', resize=>1, frame=>2);
+    $this->set_frame(file=>'media/images/nowplaying-speaker3.png', resize=>1, frame=>3);
+    $this->set_frame(file=>'media/images/nowplaying-speaker4.png', resize=>1, frame=>4);
+    $this->set_frame(file=>'media/images/nowplaying-speaker5.png', resize=>1, frame=>5);
+    $this->set_frame(file=>'media/images/nowplaying-speaker6.png', resize=>1, frame=>6);
 
-    $this->set_depressed_frame(file=>'images/nowplaying-speaker0.png', resize=>1, frame=>0);
-    $this->set_depressed_frame(file=>'images/nowplaying-speaker1.png', resize=>1, frame=>1);
-    $this->set_depressed_frame(file=>'images/nowplaying-speaker2.png', resize=>1, frame=>2);
-    $this->set_depressed_frame(file=>'images/nowplaying-speaker3.png', resize=>1, frame=>3);
-    $this->set_depressed_frame(file=>'images/nowplaying-speaker4.png', resize=>1, frame=>4);
-    $this->set_depressed_frame(file=>'images/nowplaying-speaker5.png', resize=>1, frame=>5);
-    $this->set_depressed_frame(file=>'images/nowplaying-speaker6.png', resize=>1, frame=>6);
+    $this->set_depressed_frame(file=>'media/images/nowplaying-speaker0.png', resize=>1, frame=>0);
+    $this->set_depressed_frame(file=>'media/images/nowplaying-speaker1.png', resize=>1, frame=>1);
+    $this->set_depressed_frame(file=>'media/images/nowplaying-speaker2.png', resize=>1, frame=>2);
+    $this->set_depressed_frame(file=>'media/images/nowplaying-speaker3.png', resize=>1, frame=>3);
+    $this->set_depressed_frame(file=>'media/images/nowplaying-speaker4.png', resize=>1, frame=>4);
+    $this->set_depressed_frame(file=>'media/images/nowplaying-speaker5.png', resize=>1, frame=>5);
+    $this->set_depressed_frame(file=>'media/images/nowplaying-speaker6.png', resize=>1, frame=>6);
 
     #$this->animate(550);
 

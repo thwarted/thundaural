@@ -36,7 +36,7 @@ sub widget_initialize {
     my $surf = new SDL::Surface(-width=>$area->width(), -height=>$area->height(), -depth=>32);
     $this->surface($surf);
 
-    $this->{font} = new SDL::TTFont(-name=>"./fonts/Vera.ttf", -size=>17, -bg=>$this->{bgcolor}, -fg=>$this->{fgcolor});
+    $this->{font} = new SDL::TTFont(-name=>"media/fonts/Vera.ttf", -size=>17, -bg=>$this->{bgcolor}, -fg=>$this->{fgcolor});
 
     $this->{lookingforchange} = 0;
     $this->{laststate} = 0;

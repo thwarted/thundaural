@@ -16,8 +16,8 @@ sub widget_initialize {
     my $area = new SDL::Rect(-x=>945, -y=>105, -width=>66, -height=>75);
     $this->area($area);
 
-    $this->set_frame(file=>'images/arrow-up-white.png', frame=>0);
-    $this->set_depressed_frame(file=>'images/arrow-up-red.png', frame=>0);
+    $this->set_frame(file=>'media/images/arrow-up-white.png', frame=>0);
+    $this->set_depressed_frame(file=>'media/images/arrow-up-red.png', frame=>0);
 
     #$this->bgcolor(new SDL::Color(-r=>160, -g=>160, -b=>160));
 

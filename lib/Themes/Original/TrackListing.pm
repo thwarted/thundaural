@@ -66,7 +66,7 @@ sub widget_initialize {
     $this->add_widget($header);
     $this->{headerbgcolor} = new SDL::Color(-r=>160, -g=>160, -b=>160);
     $this->{headerfgcolor} = new SDL::Color(-r=>0, -g=>0, -b=>0);
-    $this->{headerfont} = new SDL::TTFont(-name=>"./fonts/Vera.ttf", -size=>20, -bg=>$this->{headerbgcolor}, -fg=>$this->{headerfgcolor});
+    $this->{headerfont} = new SDL::TTFont(-name=>"media/fonts/Vera.ttf", -size=>20, -bg=>$this->{headerbgcolor}, -fg=>$this->{headerfgcolor});
 
     my $apbarea = new SDL::Rect(-x=>10, -y=>400, -width=>150, -height=>60);
     my $apb = new Themes::Original::PlayAllButton(name=>'playall', area=>$apbarea);

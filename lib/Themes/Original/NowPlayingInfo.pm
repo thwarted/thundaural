@@ -37,7 +37,7 @@ sub widget_initialize {
     $this->{bgcolor} = new SDL::Color(-r=>160, -b=>160, -g=>160);
     $this->{fgcolor} = new SDL::Color(-r=>0, -b=>0, -g=>0);
 
-    $this->{font} = new SDL::TTFont(-name=>"./fonts/Vera.ttf", -size=>17, -bg=>$this->{bgcolor}, -fg=>$this->{fgcolor});
+    $this->{font} = new SDL::TTFont(-name=>"media/fonts/Vera.ttf", -size=>17, -bg=>$this->{bgcolor}, -fg=>$this->{fgcolor});
 
     $this->{lastupdate} = 0;
     $this->{lasttrackref} = 0;

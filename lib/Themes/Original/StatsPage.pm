@@ -33,7 +33,7 @@ sub widget_initialize {
     my $bgcolor = new SDL::Color(-r=>140, -g=>140, -b=>140);
     my $fgcolor = new SDL::Color(-r=>180, -g=>180, -b=>180);
     my $labelcolor = new SDL::Color(-r=>0, -g=>0, -b=>0);
-    my $f = new SDL::TTFont(-name=>"./fonts/Vera.ttf", -size=>21, -bg=>$fgcolor, -fg=>$labelcolor);
+    my $f = new SDL::TTFont(-name=>"media/fonts/Vera.ttf", -size=>21, -bg=>$fgcolor, -fg=>$labelcolor);
     my $w = new Widget::ProgressBar(name=>'diskspace', area=>$dsarea, bgcolor=>$bgcolor, fgcolor=>$fgcolor, font=>$f);
     $w->type('bar');
     $this->add_widget($w);

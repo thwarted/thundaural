@@ -31,7 +31,7 @@ sub widget_initialize {
     $this->{face} = new SDL::Surface(-width=>$area->width(), -height=>$area->height(), -depth=>32);
     $this->set_frame(frame=>0, surface=>$this->{face}, resize=>0);
 
-    $this->{font} = new SDL::TTFont(-name=>"./fonts/Vera.ttf", -size=>20, -bg=>$this->{bgcolor}, -fg=>$this->{fgcolor});
+    $this->{font} = new SDL::TTFont(-name=>"media/fonts/Vera.ttf", -size=>20, -bg=>$this->{bgcolor}, -fg=>$this->{fgcolor});
 
     $this->{mode} = 'idle';
     $this->update_face($this->{mode});
