@@ -75,3 +75,33 @@ To have the client start automaticly on boot, put that same line in
 
     i4:4:respawn:/usr/local/thundaural/startup/start-x-for-jukebox jukecl
 
+----------------------------------------------------------------------
+A word on X console access:
+
+Modern distributions keep users who are not sitting at the console (or users
+that it thinks are not sitting at the console) from running the X server.
+This is enforced via pam.  Most likely, you have a pam configuration for the
+xserver that looks like (/etc/pam.d/xserver)
+
+        #%PAM-1.0
+        auth       sufficient  pam_rootok.so
+        auth       required    pam_console.so
+        account    required    pam_permit.so
+
+The inittab entry above (starting the client at boot) invokes a script that
+uses su to change to a non-root user before running the Thundaural client.  
+Unfortunately, the pam_console line above will enforce that the console be
+owned by the user attempting to run X.  You may need to change this to allow
+non-console owners to run X.  Change /etc/pam.d/xserver to look like the
+following:
+
+        #%PAM-1.0
+        #auth       sufficient  pam_rootok.so
+        #auth       required    pam_console.so
+        auth        required    pam_permit.so
+        account     required    pam_permit.so
+
+I had a lot of trouble finding information about this on the Internet, finally
+finding https://listman.redhat.com/archives/pam-list/2000-October/msg00065.html
+which outlines what to change.
+
