@@ -32,6 +32,7 @@ sub new {
     $this->{_pb}->{type} = 'line'; # line or bar
     $this->{_pb}->{orient} = 'h'; # h or v
     $this->{_pb}->{pctfull} = 0;
+    $this->{_pb}->{onClick} = undef;
     $this->{_pb}->{fgcolor} = $o{bgcolor};
     $this->{_pb}->{bgcolor} = $o{fgcolor};
     $this->{_pb}->{font} = $o{font};
@@ -232,9 +233,19 @@ sub onMouseUp_interior {
     $this->onClick(percentage=>$pct);
 }
 
-sub onClick {
-    # child should override
-    return 0;
+sub onClick { 
+    my $this = shift;
+    if (my $sub = $this->{_pb}->{onClick}) {
+        if (ref($sub) eq 'CODE') {
+            return &$sub($this, @_);
+        }
+    }
+    return 0; 
+}
+
+sub set_onClick {
+    my $this = shift;
+    $this->{_pb}->{onClick} = shift;
 }
 
 1;
