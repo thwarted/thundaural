@@ -125,12 +125,13 @@ if ($sx->{infofile} && !$sx->{cddevice}) {
     $cdinfo->{riptime} = 0;
     foreach my $track (@{$cdinfo->{tracks}}) {
         my $artist = $track->{performer};
-        if ($cdinfo->{album}->{performer} =~ m/various artists/i) {
-            $artist = "(Various Artists) $artist";
-        }
         my $album = $cdinfo->{album}->{albumname};
         my $tracknum = $track->{tracknum};
         my $title = $track->{trackname};
+        if ($cdinfo->{album}->{performer} =~ m/various artists/i) {
+            $title = "$artist :: $title";
+            $artist = "Various Artists";
+        }
         $track->{sortdir} = &get_sort_dir($artist);
         $track->{finalfilename} = sprintf("%s :: %s :: %02d :: %s.ogg", &unslash($artist), &unslash($album), $tracknum, &unslash($title));
     }
@@ -252,6 +253,7 @@ sub add_album {
                 $failed = "renaming track to existing file";
                 last TRANSACTION;
             }
+            print "creating $newfile\n";
             if (!(&move_file($track->{filename}, $newfile))) {
                 $failed = "file rename failed: $!";
                 last TRANSACTION;
