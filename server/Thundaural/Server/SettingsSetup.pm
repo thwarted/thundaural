@@ -16,9 +16,9 @@ use Data::Dumper;
 use Getopt::Long;
 
 my @configfiles = qw( 
-	/etc/thundaural/server.conf
-	../thundaural-server.conf
-	./thundaural-server.conf
+    /etc/thundaural/server.conf
+    ../thundaural-server.conf
+    ./thundaural-server.conf
 );
 
 our %devorder = ();
@@ -27,39 +27,41 @@ our $_defaultplaydevice;
 our $_progs = {};
 our $_cmds = {};
 our $_vars = {
-	storagedir=>'', 
-	homedir=>'', 
-	dbfile=>'', 
-	listenport=>'', 
-	listenhost=>'', 
-	foreground=>0,
-	pausebetween=>4,
-	convert=>0,
-	};
+    storagedir=>'', 
+    homedir=>'', 
+    dbfile=>'', 
+    listenport=>'', 
+    listenhost=>'', 
+    foreground=>0,
+    pausebetween=>4,
+    convert=>0,
+    createdb=>0,
+    };
 
 my %options = (
-	'more-help'=>\&usage,
-	'config=s'=>\&load_config,
-	'prog=s'=>\&set_prog,
-	'cmd=s'=>\&set_cmd,
-	'device=s'=>\&set_device,
-	'storagedir=s'=>\($_vars->{storagedir}),
-	'homedir=s'=>\($_vars->{homedir}),
-	'dbfile=s'=>\($_vars->{dbfile}),
-	'pausebetween=i'=>\($_vars->{pausebetween}),
-	'listenport=i'=>\($_vars->{listenport}),
-	'listenhost=s'=>\($_vars->{listenhost}),
-	'foreground|f'=>\($_vars->{foreground}),
-	'log=s'=>\($_vars->{logto}),
-	'dumpconf'=>\&dumpconf,
-	'convert=s'=>\($_vars->{convert}),
-	'convert-help'=>\&convert_help,
+    'more-help'=>\&usage,
+    'config=s'=>\&load_config,
+    'prog=s'=>\&set_prog,
+    'cmd=s'=>\&set_cmd,
+    'device=s'=>\&set_device,
+    'storagedir=s'=>\($_vars->{storagedir}),
+    'homedir=s'=>\($_vars->{homedir}),
+    'dbfile=s'=>\($_vars->{dbfile}),
+    'createdb'=>\($_vars->{dbsetup}),
+    'pausebetween=i'=>\($_vars->{pausebetween}),
+    'listenport=i'=>\($_vars->{listenport}),
+    'listenhost=s'=>\($_vars->{listenhost}),
+    'foreground|f'=>\($_vars->{foreground}),
+    'log=s'=>\($_vars->{logto}),
+    'dumpconf'=>\&dumpconf,
+    'convert=s'=>\($_vars->{convert}),
+    'convert-help'=>\&convert_help,
 );
 my %not_allowed_in_configfile = (convert=>1, 'convert-help'=>1);
 
 sub usage {
-	my $cfgs = join("\n    ", @configfiles);
-	print <<"EOF";
+    my $cfgs = join("\n    ", @configfiles);
+    print <<"EOF";
 $0 <option> ...
   --help               program specific help
   --more-help          additional, global options
@@ -70,6 +72,7 @@ $0 <option> ...
   --cmd <s>            specify a support command (with arguments)
   --storagedir <dir>   specify the storage directory
   --dbfile <sfile>     the database file
+  --createdb           write the initial database file and exit
   --listenhost         the address to listen on
   --listenport         the port to listen on
   --pausebetween <n>   the number of seconds to pause between songs
@@ -103,17 +106,17 @@ configuration files have been read and all command line options.
 
 ** Can not be specified in a configuration file.
 EOF
-	exit;
+    exit;
 }
 
 sub dumpconf {
-	local $Data::Dumper::Terse = 1;
-	local $Data::Dumper::Indent = 1;
-	print Dumper($_devices);
-	print Dumper($_progs);
-	print Dumper($_cmds);
-	print Dumper($_vars);
-	exit;
+    local $Data::Dumper::Terse = 1;
+    local $Data::Dumper::Indent = 1;
+    print Dumper($_devices);
+    print Dumper($_progs);
+    print Dumper($_cmds);
+    print Dumper($_vars);
+    exit;
 }
 
 # we get a little tricky here
@@ -126,102 +129,102 @@ sub dumpconf {
 # advantage of enforcing the same format for the config file and the command 
 # line arguments
 foreach my $c (@configfiles) {
-	my @newargs = &read_configfile($c);
-	unshift @ARGV, @newargs if (@newargs);
+    my @newargs = &read_configfile($c);
+    unshift @ARGV, @newargs if (@newargs);
 }
 
 &usage unless GetOptions(%options);
 
 # dbfile is relative to storagedir
 if ($_vars->{dbfile} !~ m/^\//) {
-	$_vars->{dbfile} = sprintf('%s/%s', $_vars->{storagedir}, $_vars->{dbfile});
+    $_vars->{dbfile} = sprintf('%s/%s', $_vars->{storagedir}, $_vars->{dbfile});
 }
 
 sub read_configfile {
-	# can't use die here , we'll called from a use/require block (which is part of BEGIN)
-	# die will propagate an error back up the callstack
-	my $configfile = shift;
-	if (open(CONF, "<$configfile")) {
-		my $lines = 0;
-		my @newargs = ();
-		while(<CONF>) {
-			$lines++;
-			chomp;
-			s/\s*#.*$//g; 
-			s/^\s+//g; 
-			s/\s+$//g; 
-			next if (m/^\s*$/);
-			my ($k, undef, $v) = m/^(\w+)(\s+(.*))$/;
-			if ($k) {
-				if ($not_allowed_in_configfile{$k}) {
-					print STDERR "$0: \"$k\" found in $configfile, but can only be specified on the command line.\n";
-					exit 1;
-				} else {
-					push(@newargs, "--$k");
-					push(@newargs, $v) if ($v);
-					next;
-				}
-			}
-			print STDERR "$0: line $lines of $configfile is unparsable\n";
-			exit 1;
-		}
-		close(CONF);
-		return @newargs;
-	}
+    # can't use die here , we'll called from a use/require block (which is part of BEGIN)
+    # die will propagate an error back up the callstack
+    my $configfile = shift;
+    if (open(CONF, "<$configfile")) {
+        my $lines = 0;
+        my @newargs = ();
+        while(<CONF>) {
+            $lines++;
+            chomp;
+            s/\s*#.*$//g; 
+            s/^\s+//g; 
+            s/\s+$//g; 
+            next if (m/^\s*$/);
+            my ($k, undef, $v) = m/^(\w+)(\s+(.*))$/;
+            if ($k) {
+                if ($not_allowed_in_configfile{$k}) {
+                    print STDERR "$0: \"$k\" found in $configfile, but can only be specified on the command line.\n";
+                    exit 1;
+                } else {
+                    push(@newargs, "--$k");
+                    push(@newargs, $v) if ($v);
+                    next;
+                }
+            }
+            print STDERR "$0: line $lines of $configfile is unparsable\n";
+            exit 1;
+        }
+        close(CONF);
+        return @newargs;
+    }
 }
 
 sub load_config {
-	my $opt = shift;
-	my $value = shift;
+    my $opt = shift;
+    my $value = shift;
 
-	# tricky -- thankfully Getopt::Long eats up @ARGV
-	# so we can just add more stuff at the begining
-	# and it will consume that also :)
-	my @x = &read_configfile($value);
-	unshift(@ARGV, @x) if (@x);
+    # tricky -- thankfully Getopt::Long eats up @ARGV
+    # so we can just add more stuff at the begining
+    # and it will consume that also :)
+    my @x = &read_configfile($value);
+    unshift(@ARGV, @x) if (@x);
 }
 
 sub set_prog {
-	my $opt = shift;
-	my $value = shift;
+    my $opt = shift;
+    my $value = shift;
 
-	my($p, $path) = $value =~ m/^(\w+):(.+)$/;
-	die("$0: $path is not executable\n")
-	unless (-x $path);
-	$_progs->{$p} = $path;
+    my($p, $path) = $value =~ m/^(\w+):(.+)$/;
+    die("$0: $path is not executable\n")
+    unless (-x $path);
+    $_progs->{$p} = $path;
 }
 
 sub set_cmd {
-	my $opt = shift;
-	my $value = shift;
+    my $opt = shift;
+    my $value = shift;
 
-	my($p, $path) = $value =~ m/^(\w+):(.+)$/;
-	# cmds are relative to homedir
-	if ($path !~ m/^\//) {
-		$path = sprintf('%s/%s', $_vars->{homedir}, $path);
-	}
-	$_cmds->{$p} = $path;
+    my($p, $path) = $value =~ m/^(\w+):(.+)$/;
+    # cmds are relative to homedir
+    if ($path !~ m/^\//) {
+        $path = sprintf('%s/%s', $_vars->{homedir}, $path);
+    }
+    $_cmds->{$p} = $path;
 }
 
 sub set_device {
-	my $opt = shift;
-	my $value = shift;
+    my $opt = shift;
+    my $value = shift;
 
-	my @x = split(/:/, $value);
-	my $devname = shift @x;
-	my $v = {};
-	while (@x) {
-		my $x = shift @x;
-		my($type, $dev) = $x =~ m/^(\w+)=(.+)$/;
-		if ($type =~ m/^(read|play)$/) {
-			$v->{_order} = ++$devorder{$type};
-		}
-		if (! $_defaultplaydevice && $type eq 'play') {
-			$_defaultplaydevice = $devname;
-		}
-		$v->{$type} = $dev;
-	}
-	$_devices->{$devname} = $v;
+    my @x = split(/:/, $value);
+    my $devname = shift @x;
+    my $v = {};
+    while (@x) {
+        my $x = shift @x;
+        my($type, $dev) = $x =~ m/^(\w+)=(.+)$/;
+        if ($type =~ m/^(read|play)$/) {
+            $v->{_order} = ++$devorder{$type};
+        }
+        if (! $_defaultplaydevice && $type eq 'play') {
+            $_defaultplaydevice = $devname;
+        }
+        $v->{$type} = $dev;
+    }
+    $_devices->{$devname} = $v;
 }
 
 sub convert_help {
@@ -230,7 +233,7 @@ print <<"EOF";
 
 Thundaural normally does certain updates to its data structures automatically.
 Some conversions and updates are optional or risky and should be invoked
-manually.  Invoke a converstion manually by using the --convert option:
+manually.  Invoke a conversion manually by using the --convert option:
 
 $0 --convert <conversion>:optionA[=x];optionB[=y];...
 
@@ -258,26 +261,26 @@ The allowable conversions are:
 
         loose
             By default, this conversion will only manipulate ogg files that 
-	    were generated by the Thundaural ripper script.  Unfortuantely, 
-	    older versions of the script didn't tag the file with that 
-	    information, making it difficult to determine if the ripper script
-	    was responsible for that file.  Setting loose=1 overrides that 
-	    detection, and will force an update to the file even if it doesn't
-	    look like the Thundaural ripper script generated the file.
+        were generated by the Thundaural ripper script.  Unfortuantely, 
+        older versions of the script didn't tag the file with that 
+        information, making it difficult to determine if the ripper script
+        was responsible for that file.  Setting loose=1 overrides that 
+        detection, and will force an update to the file even if it doesn't
+        look like the Thundaural ripper script generated the file.
 
         limit=<number>
             Retag and rename at most <number> files.  You can use this to work
-	    on the database incrementally to ensure that everything is working
-	    alright.
+        on the database incrementally to ensure that everything is working
+        alright.
 
         pause=<seconds>
             Pause for <seconds> seconds between retagging and renaming each 
-	    file.
+        file.
 
         skipiflooksdone
             If the filename looks like it has the track number already in it,
-	    skip processing that file outright.  Used in conjunction with 
-	    limit to skip files processed during previous runs.
+        skip processing that file outright.  Used in conjunction with 
+        limit to skip files processed during previous runs.
 
         dryrun
             don't actually change anything, just print out what would be done.
@@ -297,8 +300,8 @@ on the fields in the name (if necessary, which should be rare, but you never
 know).
 ----------------------------------------------------------------------
 EOF
-	
-	exit;
+    
+    exit;
 }
 
 1;

@@ -16,6 +16,10 @@ if (!defined($_defaultplaydevice)
 	die("$0: no default device defined, some error has occured\n");
 }
 
+sub createdb {
+    return $_vars->{createdb};
+}
+
 sub foreground {
 	return $_vars->{foreground};
 }

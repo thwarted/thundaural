@@ -31,13 +31,16 @@ use DBI;
 
 my $storagedir = Thundaural::Server::Settings::storagedir();
 {
+        local $Thundaural::Logger::showcaller = 0;
+        my $createdb = Thundaural::Server::Settings::createdb();
         my $c = Thundaural::Server::Settings::convert();
-        Thundaural::Logger::init($c ? 'stderr' : Thundaural::Server::Settings::logto());
+        Thundaural::Logger::init(($c||$createdb) ? 'stderr' : Thundaural::Server::Settings::logto());
         Thundaural::Server::DatabaseSetup::init(
         	dbfile=>Thundaural::Server::Settings::dbfile(),
         	storagedir=>$storagedir
         );
         &do_conversions() if ($c);
+        exit if ($createdb);
 }
 
 if (!Thundaural::Server::Settings::foreground()) {
