@@ -352,6 +352,9 @@ device cdrom:read=/dev/cdrom
 cmd ripcdrom:taripdisc --dbfile ${DBFILE} --cddevice ${DEVICEFILE} --storagedir ${STORAGEDIR} ${PROGOPTS}
 cmd volumeset:/usr/bin/aumix -d ${DEVICEFILE} -w50 -v${VOLUME}
 cmd volumequery:/usr/bin/aumix -d ${DEVICEFILE} -q
+
+log syslog
+
 EOF
 
 	if (open(CONF, ">thundaural-server.conf")) {
