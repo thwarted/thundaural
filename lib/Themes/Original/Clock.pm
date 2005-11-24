@@ -55,9 +55,9 @@ sub update {
     my @lines = ();
     my $msg;
     if ($show_seconds) {
-        $msg = sprintf('%d:%02d:%02d %s', ($hour < 12 ? ($hour ? $hour : 12 ) : $hour - 12), $min, $sec, ($hour < 12 ? 'am' : 'pm'));
+        $msg = sprintf('%d:%02d:%02d %s', ($hour < 13 ? ($hour ? $hour : 12 ) : $hour - 12), $min, $sec, ($hour < 12 ? 'am' : 'pm'));
     } else {
-        $msg = sprintf('%d:%02d %s', ($hour < 12 ? ($hour ? $hour : 12 ) : $hour - 12), $min, ($hour < 12 ? 'am' : 'pm'));
+        $msg = sprintf('%d:%02d %s', ($hour < 13 ? ($hour ? $hour : 12 ) : $hour - 12), $min, ($hour < 12 ? 'am' : 'pm'));
     }
     push(@lines, $msg);
 
