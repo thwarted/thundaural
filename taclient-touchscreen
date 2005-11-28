@@ -57,8 +57,10 @@ sub mainloop {
                 -flags=>SDL::SDL_DOUBLEBUF | SDL::SDL_HWSURFACE | SDL::SDL_HWACCEL);
     die("creation of SDL::App failed") if (!$app);
     if (!$show_mouse_cursor) {
-        # these constants are screwy, show(...) with any argument always hides it
-        SDL::Cursor::show(0);
+        # this is not a static method, so pass a filler argument for the instance
+        # the filler argument is a referene in order to help future-proof this code
+        my $x = 1;
+        SDL::Cursor::show(\$x, $show_mouse_cursor);
     }
 
     $client = new Thundaural::Client::Interface(host=>'jukebox', port=>9000, errorfunc=>\&error_message, tmpdir=>$tmpdir);
