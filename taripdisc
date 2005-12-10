@@ -735,7 +735,7 @@ sub find_audio_encoder {
 sub free_disk_space {
     my $sd = $sx->{storagedir};
     my $free;
-    if (open(X, "/bin/df $sd |")) {
+    if (open(X, "/bin/df -P $sd |")) {
         my $line = <X>; # remove header line
         $line = <X>; # data line
         close(X);
