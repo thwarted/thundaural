@@ -205,7 +205,14 @@ sub extract_mb_gid {
 	my $this = shift;
 	my $url = shift;
 	# 89ad4ac3-39f7-470e-963a-56509c546377 == various artists gid
-	my($type, $gid) = $url =~ m/^http:\/\/musicbrainz.org\/([^\/]+)\/([-0-9a-fA-F]+)(\.html)?$/;
+	# MB apparently changed the format, the URL now has the version number in it as the first
+	# component, which means that this re won't match because there are three components separated by
+	# a slash, the version, the type, and the guid, whereas this re only matches two
+	#my($type, $gid) = $url =~ m/^http:\/\/musicbrainz.org\/([^\/]+)\/([-0-9a-fA-F]+)(\.html)?$/;
+	my @s = split(m@/@, $url);
+	my $gid = pop @s;
+	$gid =~ s/\.html$//g;
+	my $type = pop @s; 
 	return {type=>$type, gid=>$gid};
 }
 
